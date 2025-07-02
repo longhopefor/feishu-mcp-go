@@ -1,0 +1,23 @@
+# 飞书 MCP 服务器配置文件
+
+# 飞书应用配置
+feishu:
+  app_id: ""  # 飞书应用 ID，建议通过环境变量设置
+  app_secret: ""  # 飞书应用密钥，建议通过环境变量设置
+  base_url: "https://open.feishu.cn/open-apis"
+  timeout: 30
+
+# 日志配置
+log:
+  level: "info"  # debug, info, warn, error
+  format: "json"  # json, text
+
+# 缓存配置
+cache:
+  enabled: true
+  ttl: 3600  # 缓存TTL（秒）
+
+# 服务器配置
+server:
+  mode: "auto"  # auto, stdio
+  port: 3333 
