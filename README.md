@@ -5,6 +5,9 @@
 
 基于 [mcp-go](https://github.com/mark3labs/mcp-go) 框架的飞书文档操作 MCP 服务器，为 Cursor、Windsurf、Cline 等 AI 驱动的编码工具提供访问飞书文档的能力。
 
+> 📋 **项目开发进度**: [查看详细开发计划](./todo_list.md) | [技术实现方案](./cursor_readme.md)  
+> 🚀 **当前状态**: Phase 2 飞书API集成中 (25%完成)
+
 ## 🚀 特性
 
 - **完全兼容 MCP 协议**：支持所有 AI 编程工具

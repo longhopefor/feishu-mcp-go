@@ -32,6 +32,39 @@ type BaseResponse struct {
 	Msg  string `json:"msg"`
 }
 
+// Document 文档相关数据结构
+type Document struct {
+	DocumentID string `json:"document_id"`
+	Token      string `json:"token"`
+	Title      string `json:"title"`
+	OwnerID    string `json:"owner_id"`
+	CreateTime string `json:"create_time"`
+	UpdateTime string `json:"update_time"`
+}
+
+// CreateDocumentRequest 创建文档请求
+type CreateDocumentRequest struct {
+	FolderToken string `json:"folder_token"`
+	Title       string `json:"title"`
+}
+
+// CreateDocumentResponse 创建文档响应
+type CreateDocumentResponse struct {
+	BaseResponse
+	Data Document `json:"data"`
+}
+
+// DocumentInfo 文档信息
+type DocumentInfo struct {
+	Document Document `json:"document"`
+}
+
+// GetDocumentResponse 获取文档响应
+type GetDocumentResponse struct {
+	BaseResponse
+	Data DocumentInfo `json:"data"`
+}
+
 // NewClient 创建新的飞书客户端
 func NewClient(appID, appSecret, baseURL string) (*Client, error) {
 	if appID == "" || appSecret == "" {
@@ -186,4 +219,49 @@ func (c *Client) SetRetry(count int, waitTime, maxWaitTime time.Duration) {
 	c.client.SetRetryCount(count).
 		SetRetryWaitTime(waitTime).
 		SetRetryMaxWaitTime(maxWaitTime)
+}
+
+// CreateDocument 创建文档
+func (c *Client) CreateDocument(folderToken, title string) (*Document, error) {
+	req := CreateDocumentRequest{
+		FolderToken: folderToken,
+		Title:       title,
+	}
+
+	resp, err := c.Post("/docx/v1/documents", req)
+	if err != nil {
+		return nil, fmt.Errorf("创建文档请求失败: %w", err)
+	}
+
+	var createResp CreateDocumentResponse
+	if err := json.Unmarshal(resp.Body(), &createResp); err != nil {
+		return nil, fmt.Errorf("解析创建文档响应失败: %w", err)
+	}
+
+	if createResp.Code != 0 {
+		return nil, fmt.Errorf("创建文档失败 (code: %d): %s", createResp.Code, createResp.Msg)
+	}
+
+	return &createResp.Data, nil
+}
+
+// GetDocument 获取文档信息
+func (c *Client) GetDocument(documentID string) (*Document, error) {
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s", documentID)
+
+	resp, err := c.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("获取文档请求失败: %w", err)
+	}
+
+	var getResp GetDocumentResponse
+	if err := json.Unmarshal(resp.Body(), &getResp); err != nil {
+		return nil, fmt.Errorf("解析获取文档响应失败: %w", err)
+	}
+
+	if getResp.Code != 0 {
+		return nil, fmt.Errorf("获取文档失败 (code: %d): %s", getResp.Code, getResp.Msg)
+	}
+
+	return &getResp.Data.Document, nil
 }
