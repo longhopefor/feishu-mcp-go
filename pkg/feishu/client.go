@@ -65,6 +65,68 @@ type GetDocumentResponse struct {
 	Data DocumentInfo `json:"data"`
 }
 
+// GetDocumentContentRequest 获取文档内容请求
+type GetDocumentContentRequest struct {
+	DocumentID string `json:"document_id"`
+	Lang       int    `json:"lang,omitempty"` // 0: 中文, 1: 英文
+}
+
+// DocumentContent 文档内容
+type DocumentContent struct {
+	Content string `json:"content"`
+}
+
+// GetDocumentContentResponse 获取文档内容响应
+type GetDocumentContentResponse struct {
+	BaseResponse
+	Data DocumentContent `json:"data"`
+}
+
+// Block 文档块结构
+type Block struct {
+	BlockID    string                 `json:"block_id"`
+	BlockType  string                 `json:"block_type"`
+	ParentID   string                 `json:"parent_id"`
+	Children   []string               `json:"children"`
+	Properties map[string]interface{} `json:"properties"`
+}
+
+// GetDocumentBlocksResponse 获取文档块响应
+type GetDocumentBlocksResponse struct {
+	BaseResponse
+	Data struct {
+		Blocks []Block `json:"blocks"`
+	} `json:"data"`
+}
+
+// SearchDocumentsRequest 搜索文档请求
+type SearchDocumentsRequest struct {
+	SearchKey string `json:"search_key"`
+	PageSize  int    `json:"page_size,omitempty"`
+	PageToken string `json:"page_token,omitempty"`
+}
+
+// SearchDocument 搜索到的文档
+type SearchDocument struct {
+	DocumentID string `json:"document_id"`
+	Token      string `json:"token"`
+	Title      string `json:"title"`
+	OwnerID    string `json:"owner_id"`
+	CreateTime string `json:"create_time"`
+	UpdateTime string `json:"update_time"`
+	URL        string `json:"url"`
+}
+
+// SearchDocumentsResponse 搜索文档响应
+type SearchDocumentsResponse struct {
+	BaseResponse
+	Data struct {
+		Documents []SearchDocument `json:"documents"`
+		PageToken string           `json:"page_token"`
+		HasMore   bool             `json:"has_more"`
+	} `json:"data"`
+}
+
 // NewClient 创建新的飞书客户端
 func NewClient(appID, appSecret, baseURL string) (*Client, error) {
 	if appID == "" || appSecret == "" {
@@ -264,4 +326,102 @@ func (c *Client) GetDocument(documentID string) (*Document, error) {
 	}
 
 	return &getResp.Data.Document, nil
+}
+
+// GetDocumentContent 获取文档内容
+func (c *Client) GetDocumentContent(documentID string, lang int) (*DocumentContent, error) {
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/content", documentID)
+
+	// 构建查询参数
+	reqURL := c.baseURL + endpoint
+	if lang != 0 {
+		reqURL += fmt.Sprintf("?lang=%d", lang)
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(reqURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取文档内容请求失败: %w", err)
+	}
+
+	var contentResp GetDocumentContentResponse
+	if err := json.Unmarshal(resp.Body(), &contentResp); err != nil {
+		return nil, fmt.Errorf("解析文档内容响应失败: %w", err)
+	}
+
+	if contentResp.Code != 0 {
+		return nil, fmt.Errorf("获取文档内容失败 (code: %d): %s", contentResp.Code, contentResp.Msg)
+	}
+
+	return &contentResp.Data, nil
+}
+
+// GetDocumentBlocks 获取文档块结构
+func (c *Client) GetDocumentBlocks(documentID string) ([]Block, error) {
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks", documentID)
+
+	resp, err := c.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("获取文档块结构请求失败: %w", err)
+	}
+
+	var blocksResp GetDocumentBlocksResponse
+	if err := json.Unmarshal(resp.Body(), &blocksResp); err != nil {
+		return nil, fmt.Errorf("解析文档块结构响应失败: %w", err)
+	}
+
+	if blocksResp.Code != 0 {
+		return nil, fmt.Errorf("获取文档块结构失败 (code: %d): %s", blocksResp.Code, blocksResp.Msg)
+	}
+
+	return blocksResp.Data.Blocks, nil
+}
+
+// SearchDocuments 搜索文档
+func (c *Client) SearchDocuments(searchKey string, pageSize int, pageToken string) (*SearchDocumentsResponse, error) {
+	endpoint := "/search/v2/doc"
+
+	// 构建请求URL和参数
+	reqURL := c.baseURL + endpoint + "?search_key=" + searchKey
+
+	if pageSize > 0 {
+		reqURL += fmt.Sprintf("&page_size=%d", pageSize)
+	}
+
+	if pageToken != "" {
+		reqURL += fmt.Sprintf("&page_token=%s", pageToken)
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(reqURL)
+
+	if err != nil {
+		return nil, fmt.Errorf("搜索文档请求失败: %w", err)
+	}
+
+	var searchResp SearchDocumentsResponse
+	if err := json.Unmarshal(resp.Body(), &searchResp); err != nil {
+		return nil, fmt.Errorf("解析搜索文档响应失败: %w", err)
+	}
+
+	if searchResp.Code != 0 {
+		return nil, fmt.Errorf("搜索文档失败 (code: %d): %s", searchResp.Code, searchResp.Msg)
+	}
+
+	return &searchResp, nil
 }

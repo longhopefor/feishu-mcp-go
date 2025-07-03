@@ -190,67 +190,206 @@ func getDocumentInfo(feishu *feishu.Client, logger logger.Logger, request mcp.Ca
 	}, nil
 }
 
-// getDocumentContent 获取文档内容实现（占位符）
+// getDocumentContent 获取文档内容实现
 func getDocumentContent(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	logger.Info("获取文档内容功能待实现", "name", request.Params.Name)
+	logger.Info("开始获取文档内容", "name", request.Params.Name)
 
-	result := map[string]interface{}{
-		"success": false,
-		"message": "get_feishu_document_content 功能待实现",
-		"status":  "TODO",
+	// 解析参数
+	var args map[string]interface{}
+
+	// 安全地处理参数类型断言
+	if request.Params.Arguments != nil {
+		if argBytes, ok := request.Params.Arguments.([]byte); ok {
+			if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		} else if argMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			args = argMap
+		} else {
+			// 尝试通过JSON序列化再反序列化
+			if argBytes, err := json.Marshal(request.Params.Arguments); err != nil {
+				return nil, fmt.Errorf("参数格式错误: %w", err)
+			} else if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		}
 	}
 
-	content, _ := json.MarshalIndent(result, "", "  ")
+	documentId, ok := args["documentId"].(string)
+	if !ok || documentId == "" {
+		return nil, fmt.Errorf("documentId参数必须是非空字符串")
+	}
+
+	// 获取语言参数，默认为0（中文）
+	lang := 0
+	if langVal, ok := args["lang"]; ok {
+		if langFloat, ok := langVal.(float64); ok {
+			lang = int(langFloat)
+		}
+	}
+
+	// 调用飞书API获取文档内容
+	content, err := feishu.GetDocumentContent(documentId, lang)
+	if err != nil {
+		logger.Error("获取文档内容失败", "error", err)
+		return nil, fmt.Errorf("获取文档内容失败: %w", err)
+	}
+
+	logger.Info("获取文档内容成功", "documentId", documentId, "lang", lang)
+
+	// 构建成功响应
+	result := map[string]interface{}{
+		"success":    true,
+		"message":    "获取文档内容成功",
+		"documentId": documentId,
+		"lang":       lang,
+		"content":    content.Content,
+	}
+
+	resultJson, _ := json.MarshalIndent(result, "", "  ")
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.TextContent{
 				Type: "text",
-				Text: string(content),
+				Text: string(resultJson),
 			},
 		},
 	}, nil
 }
 
-// getDocumentBlocks 获取文档块结构实现（占位符）
+// getDocumentBlocks 获取文档块结构实现
 func getDocumentBlocks(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	logger.Info("获取文档块结构功能待实现", "name", request.Params.Name)
+	logger.Info("开始获取文档块结构", "name", request.Params.Name)
 
-	result := map[string]interface{}{
-		"success": false,
-		"message": "get_feishu_document_blocks 功能待实现",
-		"status":  "TODO",
+	// 解析参数
+	var args map[string]interface{}
+
+	// 安全地处理参数类型断言
+	if request.Params.Arguments != nil {
+		if argBytes, ok := request.Params.Arguments.([]byte); ok {
+			if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		} else if argMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			args = argMap
+		} else {
+			// 尝试通过JSON序列化再反序列化
+			if argBytes, err := json.Marshal(request.Params.Arguments); err != nil {
+				return nil, fmt.Errorf("参数格式错误: %w", err)
+			} else if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		}
 	}
 
-	content, _ := json.MarshalIndent(result, "", "  ")
+	documentId, ok := args["documentId"].(string)
+	if !ok || documentId == "" {
+		return nil, fmt.Errorf("documentId参数必须是非空字符串")
+	}
+
+	// 调用飞书API获取文档块结构
+	blocks, err := feishu.GetDocumentBlocks(documentId)
+	if err != nil {
+		logger.Error("获取文档块结构失败", "error", err)
+		return nil, fmt.Errorf("获取文档块结构失败: %w", err)
+	}
+
+	logger.Info("获取文档块结构成功", "documentId", documentId, "blocksCount", len(blocks))
+
+	// 构建成功响应
+	result := map[string]interface{}{
+		"success":     true,
+		"message":     "获取文档块结构成功",
+		"documentId":  documentId,
+		"blocksCount": len(blocks),
+		"blocks":      blocks,
+	}
+
+	resultJson, _ := json.MarshalIndent(result, "", "  ")
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.TextContent{
 				Type: "text",
-				Text: string(content),
+				Text: string(resultJson),
 			},
 		},
 	}, nil
 }
 
-// searchDocuments 搜索文档实现（占位符）
+// searchDocuments 搜索文档实现
 func searchDocuments(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	logger.Info("搜索文档功能待实现", "name", request.Params.Name)
+	logger.Info("开始搜索文档", "name", request.Params.Name)
 
-	result := map[string]interface{}{
-		"success": false,
-		"message": "search_feishu_documents 功能待实现",
-		"status":  "TODO",
+	// 解析参数
+	var args map[string]interface{}
+
+	// 安全地处理参数类型断言
+	if request.Params.Arguments != nil {
+		if argBytes, ok := request.Params.Arguments.([]byte); ok {
+			if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		} else if argMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			args = argMap
+		} else {
+			// 尝试通过JSON序列化再反序列化
+			if argBytes, err := json.Marshal(request.Params.Arguments); err != nil {
+				return nil, fmt.Errorf("参数格式错误: %w", err)
+			} else if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		}
 	}
 
-	content, _ := json.MarshalIndent(result, "", "  ")
+	searchKey, ok := args["searchKey"].(string)
+	if !ok || searchKey == "" {
+		return nil, fmt.Errorf("searchKey参数必须是非空字符串")
+	}
+
+	// 获取可选的分页参数
+	pageSize := 10 // 默认分页大小
+	if pageSizeVal, ok := args["pageSize"]; ok {
+		if pageSizeFloat, ok := pageSizeVal.(float64); ok {
+			pageSize = int(pageSizeFloat)
+		}
+	}
+
+	pageToken := ""
+	if pageTokenVal, ok := args["pageToken"]; ok {
+		if pageTokenStr, ok := pageTokenVal.(string); ok {
+			pageToken = pageTokenStr
+		}
+	}
+
+	// 调用飞书API搜索文档
+	searchResult, err := feishu.SearchDocuments(searchKey, pageSize, pageToken)
+	if err != nil {
+		logger.Error("搜索文档失败", "error", err)
+		return nil, fmt.Errorf("搜索文档失败: %w", err)
+	}
+
+	logger.Info("搜索文档成功", "searchKey", searchKey, "documentsCount", len(searchResult.Data.Documents))
+
+	// 构建成功响应
+	result := map[string]interface{}{
+		"success":        true,
+		"message":        "搜索文档成功",
+		"searchKey":      searchKey,
+		"documentsCount": len(searchResult.Data.Documents),
+		"documents":      searchResult.Data.Documents,
+		"pageToken":      searchResult.Data.PageToken,
+		"hasMore":        searchResult.Data.HasMore,
+	}
+
+	resultJson, _ := json.MarshalIndent(result, "", "  ")
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			mcp.TextContent{
 				Type: "text",
-				Text: string(content),
+				Text: string(resultJson),
 			},
 		},
 	}, nil
