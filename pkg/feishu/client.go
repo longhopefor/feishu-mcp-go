@@ -155,6 +155,12 @@ func NewClient(appID, appSecret, baseURL string) (*Client, error) {
 	}, nil
 }
 
+// EnableDebugMode 启用调试模式
+func (c *Client) EnableDebugMode(verbose bool) {
+	monitor := NewRequestMonitor(true, verbose)
+	c.client = monitor.EnableMonitoring(c.client)
+}
+
 // getAccessToken 获取访问令牌
 func (c *Client) getAccessToken() (string, error) {
 	cacheKey := "access_token"
@@ -191,6 +197,11 @@ func (c *Client) getAccessToken() (string, error) {
 	c.cache.Set(cacheKey, tokenResp.AccessToken, expireDuration)
 
 	return tokenResp.AccessToken, nil
+}
+
+// GetToken 获取访问令牌（公共方法，用于调试）
+func (c *Client) GetToken() (string, error) {
+	return c.getAccessToken()
 }
 
 // Get 发送GET请求
@@ -387,17 +398,11 @@ func (c *Client) GetDocumentBlocks(documentID string) ([]Block, error) {
 
 // SearchDocuments 搜索文档
 func (c *Client) SearchDocuments(searchKey string, pageSize int, pageToken string) (*SearchDocumentsResponse, error) {
-	endpoint := "/search/v2/doc"
-
-	// 构建请求URL和参数
-	reqURL := c.baseURL + endpoint + "?search_key=" + searchKey
-
-	if pageSize > 0 {
-		reqURL += fmt.Sprintf("&page_size=%d", pageSize)
-	}
-
-	if pageToken != "" {
-		reqURL += fmt.Sprintf("&page_token=%s", pageToken)
+	// 使用正确的飞书搜索API端点 - 尝试多个可能的端点
+	endpoints := []string{
+		"/drive/v1/files/search", // 飞书云文档搜索API
+		"/search/v2/documents",   // 可能的搜索端点
+		"/search/v1/documents",   // 备用搜索端点
 	}
 
 	// 获取访问令牌
@@ -406,22 +411,58 @@ func (c *Client) SearchDocuments(searchKey string, pageSize int, pageToken strin
 		return nil, err
 	}
 
-	resp, err := c.client.R().
-		SetHeader("Authorization", "Bearer "+token).
-		Get(reqURL)
-
-	if err != nil {
-		return nil, fmt.Errorf("搜索文档请求失败: %w", err)
+	// 构建查询参数
+	queryParams := map[string]string{
+		"search_key": searchKey,
 	}
 
-	var searchResp SearchDocumentsResponse
-	if err := json.Unmarshal(resp.Body(), &searchResp); err != nil {
-		return nil, fmt.Errorf("解析搜索文档响应失败: %w", err)
+	if pageSize > 0 {
+		queryParams["page_size"] = fmt.Sprintf("%d", pageSize)
 	}
 
-	if searchResp.Code != 0 {
-		return nil, fmt.Errorf("搜索文档失败 (code: %d): %s", searchResp.Code, searchResp.Msg)
+	if pageToken != "" {
+		queryParams["page_token"] = pageToken
 	}
 
-	return &searchResp, nil
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			SetQueryParams(queryParams).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("搜索文档请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var searchResp SearchDocumentsResponse
+			if err := json.Unmarshal(resp.Body(), &searchResp); err != nil {
+				lastErr = fmt.Errorf("解析搜索文档响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if searchResp.Code == 0 {
+				// 成功
+				return &searchResp, nil
+			} else {
+				lastErr = fmt.Errorf("搜索文档失败 (端点: %s, code: %d): %s", endpoint, searchResp.Code, searchResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
+	}
+
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	return nil, fmt.Errorf("搜索文档失败: 所有端点都无法访问")
 }

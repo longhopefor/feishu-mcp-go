@@ -43,6 +43,7 @@ logs/
 # Configuration with secrets
 config.local.yaml
 config.production.yaml
+debug.env
 
 # Test coverage
 coverage.out

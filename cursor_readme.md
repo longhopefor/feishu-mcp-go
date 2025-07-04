@@ -111,6 +111,74 @@ feishu-mcp-go/
 17. **convert_feishu_wiki_to_document_id** - Wiki链接转文档ID
 18. **get_feishu_image_resource** - 获取图片资源
 
+## 🔧 API验证和调试
+
+### 完整的调试工具链
+
+为了确保API的可靠性，项目提供了完整的调试工具链：
+
+1. **📋 调试配置** - `debug.env.example` 配置文件模板
+2. **🔍 命令行调试工具** - `cmd/debug/main.go` 
+3. **🌐 HTTP请求监控** - `pkg/feishu/monitor.go`
+4. **🏥 健康检查系统** - 自动验证API连接状态
+5. **🚀 自动化调试脚本** - `scripts/debug.sh`
+
+### 快速验证API
+
+```bash
+# 1. 设置调试配置
+cp debug.env.example debug.env
+# 编辑 debug.env 文件，填入真实的飞书应用信息
+
+# 2. 运行健康检查
+./scripts/debug.sh health
+
+# 3. 运行所有API测试
+./scripts/debug.sh all
+```
+
+### 支持的调试操作
+
+| 操作 | 命令 | 说明 |
+|------|------|------|
+| 获取令牌 | `./scripts/debug.sh token` | 测试访问令牌获取 |
+| 健康检查 | `./scripts/debug.sh health` | 执行系统健康检查 |
+| 端点验证 | `./scripts/debug.sh validate` | 验证API端点可用性 |
+| 创建文档 | `./scripts/debug.sh create-doc` | 创建测试文档 |
+| 获取文档 | `./scripts/debug.sh get-doc` | 获取文档基本信息 |
+| 获取内容 | `./scripts/debug.sh get-content` | 获取文档纯文本内容 |
+| 获取块 | `./scripts/debug.sh get-blocks` | 获取文档块结构 |
+| 搜索文档 | `./scripts/debug.sh search` | 搜索文档 |
+| 全部测试 | `./scripts/debug.sh all` | 运行所有API测试 |
+
+### HTTP请求监控
+
+启用调试模式后，可以看到详细的HTTP请求信息：
+
+```bash
+# 启用详细调试模式
+./scripts/debug.sh token
+```
+
+监控输出示例：
+```
+🌐 HTTP请求监控
+📍 URL: POST https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal
+🔑 Headers: map[Content-Type:[application/json]]
+📄 Body: {"app_id":"cli_xxxxx","app_secret":"xxxxx"}
+⏰ 时间: 2024-01-20 10:30:45
+
+📥 HTTP响应监控
+📊 状态码: 200
+⏱️ 耗时: 234ms
+📏 响应大小: 178 bytes
+📄 响应内容: {"code":0,"msg":"ok","tenant_access_token":"t-xxxxx","expire":3600}
+```
+
+### 详细文档
+
+📖 **完整的API调试指南**: [docs/api_debug_guide.md](docs/api_debug_guide.md)
+
 ## 🚀 开发进展
 
 ### ✅ 已完成的搭建工作
@@ -373,12 +441,18 @@ make run
    - 结构化的日志记录
    - 编译时类型检查确保代码正确性
 
+4. **✅ API验证和调试体系完善**
+   - 建立了完整的5层调试工具链：配置管理、命令行工具、HTTP监控、健康检查、自动化脚本
+   - 提供了详细的调试指南和错误诊断功能
+   - 支持多种调试模式：基础检查、健康检查、端点验证、完整测试
+   - 实现了智能的错误分析和调试建议
+
 ### 🔧 当前存在的问题
 
-1. **API端点可能不准确**
-   - 飞书API的具体端点（如 `/docx/v1/documents/{id}/content`）需要实际验证
-   - 部分响应结构可能与实际API不匹配
-   - 需要结合飞书开发者文档进行验证和调整
+1. **API端点需要真实验证** (已解决基础问题)
+   - ✅ 调试工具已完成，可以快速验证API端点的准确性
+   - ✅ HTTP请求监控可以实时查看API调用详情
+   - 🔄 仍需要在真实环境中运行调试工具验证所有API
 
 2. **测试覆盖不足**
    - 缺少单元测试，无法保证代码在实际环境中的稳定性
@@ -386,15 +460,16 @@ make run
    - 需要建立完整的测试框架
 
 3. **错误处理可以更细化**
-   - 当前的错误处理比较通用，可以针对飞书API的具体错误码进行更精确的处理
+   - ✅ 已实现智能错误诊断，根据HTTP状态码提供调试建议
+   - 🔄 可以进一步针对飞书API的具体错误码进行更精确的处理
    - 缺少重试机制的细节控制（如指数退避）
 
 ### 💡 改进建议和下一步重点
 
-1. **API验证和调试** (最高优先级)
-   - 在实现更多工具之前，应该先验证已完成工具的API调用
-   - 建立API调试和测试环境
-   - 完善飞书API响应的错误码处理
+1. **⚡ 立即进行API真实验证** (已具备条件)
+   - ✅ 调试工具链已完成，可以立即开始验证
+   - 使用 `./scripts/debug.sh all` 进行全面API测试
+   - 根据测试结果调整和优化API实现
 
 2. **测试驱动开发**
    - 为每个已完成的工具编写单元测试
