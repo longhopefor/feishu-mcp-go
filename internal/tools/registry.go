@@ -56,6 +56,11 @@ func RegisterAll(s *server.MCPServer, cfg *config.Config, log logger.Logger) err
 		return fmt.Errorf("注册文件夹管理工具失败: %w", err)
 	}
 
+	// 注册知识库工具
+	if err := registry.registerWikiTools(); err != nil {
+		return fmt.Errorf("注册知识库工具失败: %w", err)
+	}
+
 	// 注册工具功能
 	if err := registry.registerUtilityTools(); err != nil {
 		return fmt.Errorf("注册工具功能失败: %w", err)
@@ -120,6 +125,23 @@ func (r *ToolRegistry) registerFolderTools() error {
 	return nil
 }
 
+// registerWikiTools 注册知识库工具
+func (r *ToolRegistry) registerWikiTools() error {
+	tools := []server.ServerTool{
+		NewGetWikiSpacesTool(r.feishu, r.logger),
+		NewGetWikiNodesTool(r.feishu, r.logger),
+		NewGetWikiNodeContentTool(r.feishu, r.logger),
+		NewGetWikiNodeMetaTool(r.feishu, r.logger),
+	}
+
+	r.server.AddTools(tools...)
+	for _, tool := range tools {
+		r.logger.Debug("注册知识库工具", "name", tool.Tool.Name)
+	}
+
+	return nil
+}
+
 // registerUtilityTools 注册工具功能
 func (r *ToolRegistry) registerUtilityTools() error {
 	tools := []server.ServerTool{
@@ -137,5 +159,5 @@ func (r *ToolRegistry) registerUtilityTools() error {
 
 // getToolCount 获取已注册工具数量
 func (r *ToolRegistry) getToolCount() int {
-	return 17 // 总共17个工具
+	return 21 // 总共21个工具：文档管理5个 + 内容操作8个 + 文件夹管理3个 + 知识库4个 + 工具功能2个 = 21个
 }

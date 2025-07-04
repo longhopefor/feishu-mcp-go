@@ -147,6 +147,88 @@ type FolderDetailResponse struct {
 	} `json:"folder"`
 }
 
+// WikiSpace 知识库空间结构
+type WikiSpace struct {
+	SpaceID     string `json:"space_id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	SpaceType   string `json:"space_type"`
+	Visibility  string `json:"visibility"`
+}
+
+// GetWikiSpacesResponse 获取知识库空间响应
+type GetWikiSpacesResponse struct {
+	BaseResponse
+	Data struct {
+		Items     []WikiSpace `json:"items"` // 修正：API返回的字段名是items，不是spaces
+		PageToken string      `json:"page_token"`
+		HasMore   bool        `json:"has_more"`
+	} `json:"data"`
+}
+
+// WikiNode 知识库节点结构
+type WikiNode struct {
+	SpaceID    string `json:"space_id"`
+	NodeToken  string `json:"node_token"`
+	ObjToken   string `json:"obj_token"`
+	ObjType    string `json:"obj_type"`
+	ParentNode string `json:"parent_node_token"`
+	NodeType   string `json:"node_type"`
+	OriginNode string `json:"origin_node_token"`
+	Title      string `json:"title"`
+	HasChild   bool   `json:"has_child"`
+}
+
+// GetWikiNodesResponse 获取知识库节点响应
+type GetWikiNodesResponse struct {
+	BaseResponse
+	Data struct {
+		Items     []WikiNode `json:"items"`
+		PageToken string     `json:"page_token"`
+		HasMore   bool       `json:"has_more"`
+	} `json:"data"`
+}
+
+// WikiNodeContent 知识库节点内容
+type WikiNodeContent struct {
+	Content string `json:"content"`
+	Type    string `json:"type"`
+}
+
+// GetWikiNodeContentResponse 获取知识库节点内容响应
+type GetWikiNodeContentResponse struct {
+	BaseResponse
+	Data WikiNodeContent `json:"data"`
+}
+
+// WikiNodeMeta 知识库节点元信息
+type WikiNodeMeta struct {
+	SpaceID        string `json:"space_id"`
+	NodeToken      string `json:"node_token"`
+	ObjToken       string `json:"obj_token"`
+	ObjType        string `json:"obj_type"`
+	ParentNode     string `json:"parent_node_token"`
+	NodeType       string `json:"node_type"`
+	OriginNode     string `json:"origin_node_token"`
+	OriginSpaceID  string `json:"origin_space_id"`
+	Title          string `json:"title"`
+	HasChild       bool   `json:"has_child"`
+	NodeCreateTime string `json:"node_create_time"` // 修正：API实际字段名
+	NodeCreator    string `json:"node_creator"`     // 修正：API实际字段名
+	Creator        string `json:"creator"`
+	Owner          string `json:"owner"`
+	ObjCreateTime  string `json:"obj_create_time"` // 新增：对象创建时间
+	ObjEditTime    string `json:"obj_edit_time"`   // 新增：对象编辑时间
+}
+
+// GetWikiNodeMetaResponse 获取知识库节点元信息响应
+type GetWikiNodeMetaResponse struct {
+	BaseResponse
+	Data struct {
+		Node WikiNodeMeta `json:"node"` // 修正：API返回的数据在data.node中
+	} `json:"data"`
+}
+
 // NewClient 创建新的飞书客户端
 func NewClient(appID, appSecret, baseURL string) (*Client, error) {
 	if appID == "" || appSecret == "" {
@@ -686,4 +768,266 @@ func (c *Client) GetFolderFiles(folderToken string, pageSize int, pageToken stri
 	}
 
 	return &folderResp, nil
+}
+
+// ==================== 知识库相关方法 ====================
+
+// GetWikiSpaces 获取知识库空间列表
+func (c *Client) GetWikiSpaces(pageSize int, pageToken string) (*GetWikiSpacesResponse, error) {
+	// 知识库空间API端点
+	endpoints := []string{
+		"/wiki/v2/spaces",  // 标准知识库空间端点
+		"/wiki/v1/spaces",  // 备用端点
+		"/drive/v1/spaces", // 云文档空间端点
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建查询参数
+	queryParams := map[string]string{}
+	if pageSize > 0 {
+		queryParams["page_size"] = fmt.Sprintf("%d", pageSize)
+	}
+	if pageToken != "" {
+		queryParams["page_token"] = pageToken
+	}
+
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			SetQueryParams(queryParams).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取知识库空间请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var spacesResp GetWikiSpacesResponse
+			if err := json.Unmarshal(resp.Body(), &spacesResp); err != nil {
+				lastErr = fmt.Errorf("解析知识库空间响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if spacesResp.Code == 0 {
+				// 成功
+				return &spacesResp, nil
+			} else {
+				lastErr = fmt.Errorf("获取知识库空间失败 (端点: %s, code: %d): %s", endpoint, spacesResp.Code, spacesResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
+	}
+
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	return nil, fmt.Errorf("获取知识库空间失败: 所有端点都无法访问")
+}
+
+// GetWikiSpaceNodes 获取知识库空间下的节点列表
+func (c *Client) GetWikiSpaceNodes(spaceID string, pageSize int, pageToken string, parentNodeToken string) (*GetWikiNodesResponse, error) {
+	// 知识库节点API端点
+	endpoints := []string{
+		fmt.Sprintf("/wiki/v2/spaces/%s/nodes", spaceID),  // 标准知识库节点端点
+		fmt.Sprintf("/wiki/v1/spaces/%s/nodes", spaceID),  // 备用端点
+		fmt.Sprintf("/drive/v1/spaces/%s/nodes", spaceID), // 云文档节点端点
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建查询参数
+	queryParams := map[string]string{}
+	if pageSize > 0 {
+		queryParams["page_size"] = fmt.Sprintf("%d", pageSize)
+	}
+	if pageToken != "" {
+		queryParams["page_token"] = pageToken
+	}
+	if parentNodeToken != "" {
+		queryParams["parent_node_token"] = parentNodeToken
+	}
+
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			SetQueryParams(queryParams).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取知识库节点请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var nodesResp GetWikiNodesResponse
+			if err := json.Unmarshal(resp.Body(), &nodesResp); err != nil {
+				lastErr = fmt.Errorf("解析知识库节点响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if nodesResp.Code == 0 {
+				// 成功
+				return &nodesResp, nil
+			} else {
+				lastErr = fmt.Errorf("获取知识库节点失败 (端点: %s, code: %d): %s", endpoint, nodesResp.Code, nodesResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
+	}
+
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	return nil, fmt.Errorf("获取知识库节点失败: 所有端点都无法访问")
+}
+
+// GetWikiNodeContent 获取知识库节点内容
+func (c *Client) GetWikiNodeContent(spaceID, nodeToken string, lang int) (*WikiNodeContent, error) {
+	// 知识库节点内容API端点
+	endpoints := []string{
+		fmt.Sprintf("/wiki/v2/spaces/%s/nodes/%s/content", spaceID, nodeToken),     // 标准知识库内容端点
+		fmt.Sprintf("/wiki/v1/spaces/%s/nodes/%s/content", spaceID, nodeToken),     // 备用端点v1
+		fmt.Sprintf("/drive/v1/spaces/%s/nodes/%s/content", spaceID, nodeToken),    // 云文档内容端点
+		fmt.Sprintf("/wiki/v2/spaces/%s/nodes/%s/raw_content", spaceID, nodeToken), // 原始内容端点
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建查询参数
+	queryParams := map[string]string{}
+	if lang > 0 {
+		queryParams["lang"] = fmt.Sprintf("%d", lang)
+	}
+
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			SetQueryParams(queryParams).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取知识库节点内容请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var contentResp GetWikiNodeContentResponse
+			if err := json.Unmarshal(resp.Body(), &contentResp); err != nil {
+				lastErr = fmt.Errorf("解析知识库节点内容响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if contentResp.Code == 0 {
+				// 成功
+				return &contentResp.Data, nil
+			} else {
+				lastErr = fmt.Errorf("获取知识库节点内容失败 (端点: %s, code: %d): %s", endpoint, contentResp.Code, contentResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
+	}
+
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	return nil, fmt.Errorf("获取知识库节点内容失败: 所有端点都无法访问")
+}
+
+// GetWikiNodeMeta 获取知识库节点元信息
+func (c *Client) GetWikiNodeMeta(spaceID, nodeToken string) (*WikiNodeMeta, error) {
+	// 知识库节点元信息API端点
+	endpoints := []string{
+		fmt.Sprintf("/wiki/v2/spaces/%s/nodes/%s", spaceID, nodeToken),      // 标准知识库元信息端点
+		fmt.Sprintf("/wiki/v1/spaces/%s/nodes/%s", spaceID, nodeToken),      // 备用端点v1
+		fmt.Sprintf("/drive/v1/spaces/%s/nodes/%s", spaceID, nodeToken),     // 云文档元信息端点
+		fmt.Sprintf("/wiki/v2/spaces/%s/nodes/%s/meta", spaceID, nodeToken), // 元信息端点
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取知识库节点元信息请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var metaResp GetWikiNodeMetaResponse
+			if err := json.Unmarshal(resp.Body(), &metaResp); err != nil {
+				lastErr = fmt.Errorf("解析知识库节点元信息响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if metaResp.Code == 0 {
+				// 成功
+				return &metaResp.Data.Node, nil
+			} else {
+				lastErr = fmt.Errorf("获取知识库节点元信息失败 (端点: %s, code: %d): %s", endpoint, metaResp.Code, metaResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
+	}
+
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	return nil, fmt.Errorf("获取知识库节点元信息失败: 所有端点都无法访问")
 }
