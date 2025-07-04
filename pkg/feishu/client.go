@@ -127,6 +127,26 @@ type SearchDocumentsResponse struct {
 	} `json:"data"`
 }
 
+// FolderInfoResponse 文件夹信息响应
+type FolderInfoResponse struct {
+	Code    int    `json:"code"`
+	Msg     string `json:"msg"`
+	Folders []struct {
+		FolderToken string `json:"folder_token"`
+		FolderName  string `json:"folder_name"`
+	} `json:"folders"`
+}
+
+// FolderDetailResponse 文件夹详细信息响应
+type FolderDetailResponse struct {
+	Code   int    `json:"code"`
+	Msg    string `json:"msg"`
+	Folder struct {
+		FolderToken string `json:"folder_token"`
+		FolderName  string `json:"folder_name"`
+	} `json:"folder"`
+}
+
 // NewClient 创建新的飞书客户端
 func NewClient(appID, appSecret, baseURL string) (*Client, error) {
 	if appID == "" || appSecret == "" {
@@ -465,4 +485,106 @@ func (c *Client) SearchDocuments(searchKey string, pageSize int, pageToken strin
 	}
 
 	return nil, fmt.Errorf("搜索文档失败: 所有端点都无法访问")
+}
+
+// GetRootFolderInfo 获取根目录信息
+func (c *Client) GetRootFolderInfo() (*FolderInfoResponse, error) {
+	endpoint := "/drive/v1/files"
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetQueryParam("folder_token", ""). // 空值表示根目录
+		SetQueryParam("page_size", "10").
+		Get(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取根目录信息失败: %w", err)
+	}
+
+	var folderResp FolderInfoResponse
+	if err := json.Unmarshal(resp.Body(), &folderResp); err != nil {
+		return nil, fmt.Errorf("解析根目录信息响应失败: %w", err)
+	}
+
+	if folderResp.Code != 0 {
+		return nil, fmt.Errorf("获取根目录信息失败: %s", folderResp.Msg)
+	}
+
+	return &folderResp, nil
+}
+
+// GetFolderInfo 获取指定文件夹信息
+func (c *Client) GetFolderInfo(folderToken string) (*FolderDetailResponse, error) {
+	endpoint := fmt.Sprintf("/drive/v1/folders/%s", folderToken)
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取文件夹信息失败: %w", err)
+	}
+
+	var folderResp FolderDetailResponse
+	if err := json.Unmarshal(resp.Body(), &folderResp); err != nil {
+		return nil, fmt.Errorf("解析文件夹信息响应失败: %w", err)
+	}
+
+	if folderResp.Code != 0 {
+		return nil, fmt.Errorf("获取文件夹信息失败: %s", folderResp.Msg)
+	}
+
+	return &folderResp, nil
+}
+
+// GetFolderFiles 获取文件夹下的文件列表
+func (c *Client) GetFolderFiles(folderToken string, pageSize int, pageToken string) (*FolderInfoResponse, error) {
+	endpoint := "/drive/v1/files"
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	req := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetQueryParam("folder_token", folderToken)
+
+	if pageSize > 0 {
+		req.SetQueryParam("page_size", fmt.Sprintf("%d", pageSize))
+	}
+
+	if pageToken != "" {
+		req.SetQueryParam("page_token", pageToken)
+	}
+
+	resp, err := req.Get(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取文件夹文件列表失败: %w", err)
+	}
+
+	var folderResp FolderInfoResponse
+	if err := json.Unmarshal(resp.Body(), &folderResp); err != nil {
+		return nil, fmt.Errorf("解析文件夹文件列表响应失败: %w", err)
+	}
+
+	if folderResp.Code != 0 {
+		return nil, fmt.Errorf("获取文件夹文件列表失败: %s", folderResp.Msg)
+	}
+
+	return &folderResp, nil
 }

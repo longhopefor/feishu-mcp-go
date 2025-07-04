@@ -98,6 +98,10 @@ case "$ACTION" in
         echo "🔍 测试搜索文档: $SEARCH_KEY"
         ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=search -search-key="$SEARCH_KEY" $DEBUG_FLAG $VERBOSE_FLAG
         ;;
+    "folder-info"|"folder")
+        echo "📁 测试获取文件夹信息..."
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=folder-info $DEBUG_FLAG $VERBOSE_FLAG
+        ;;
     "all")
         echo "🚀 运行所有API测试..."
         echo ""
@@ -150,6 +154,12 @@ case "$ACTION" in
         ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=search -search-key="test" $DEBUG_FLAG $VERBOSE_FLAG
         echo ""
         
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "📁 8. 测试获取文件夹信息"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=folder-info $DEBUG_FLAG $VERBOSE_FLAG
+        echo ""
+        
         echo "🎉 所有API测试完成!"
         ;;
     *)
@@ -166,6 +176,8 @@ case "$ACTION" in
         echo "  get-content - 测试获取文档内容"
         echo "  get-blocks  - 测试获取文档块"
         echo "  search      - 测试搜索文档"
+        echo "  folder-info - 测试获取文件夹信息"
+        echo "  folder      - 测试获取文件夹信息(别名)"
         echo "  all         - 运行所有API测试"
         echo ""
         echo "配置文件: debug.env"

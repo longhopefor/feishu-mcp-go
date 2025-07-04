@@ -15,7 +15,7 @@ var (
 	appID     = flag.String("app-id", "", "飞书应用ID")
 	appSecret = flag.String("app-secret", "", "飞书应用密钥")
 	baseURL   = flag.String("base-url", "https://open.feishu.cn/open-apis", "飞书API基础URL")
-	action    = flag.String("action", "", "要执行的操作：token, create-doc, get-doc, get-content, get-blocks, search, health, validate")
+	action    = flag.String("action", "", "要执行的操作：token, create-doc, get-doc, get-content, get-blocks, search, health, validate, folder-info, folder")
 
 	// 文档相关参数
 	docID       = flag.String("doc-id", "", "文档ID")
@@ -71,6 +71,10 @@ func main() {
 		debugHealthCheck(client, logger)
 	case "validate":
 		debugValidateAPI(client, logger)
+	case "folder-info":
+		debugGetFolderInfo(client, logger)
+	case "folder":
+		debugGetFolderInfo(client, logger)
 	default:
 		fmt.Println("支持的操作:")
 		fmt.Println("  token       - 测试获取访问令牌")
@@ -81,6 +85,8 @@ func main() {
 		fmt.Println("  search      - 测试搜索文档 (需要 -search-key)")
 		fmt.Println("  health      - 执行健康检查")
 		fmt.Println("  validate    - 验证API端点")
+		fmt.Println("  folder-info - 测试获取文件夹信息")
+		fmt.Println("  folder      - 测试获取文件夹信息")
 		fmt.Println("")
 		fmt.Println("调试选项:")
 		fmt.Println("  -debug      - 启用调试模式")
@@ -229,6 +235,65 @@ func debugValidateAPI(client *feishu.Client, logger logger.Logger) {
 	validator.ValidateEndpoints()
 
 	fmt.Println("✅ API端点验证完成!")
+}
+
+func debugGetFolderInfo(client *feishu.Client, logger logger.Logger) {
+	fmt.Println("📁 测试获取文件夹信息...")
+
+	// 从环境变量获取测试文件夹token
+	folderToken := os.Getenv("TEST_FOLDER_TOKEN")
+	if folderToken == "" {
+		fmt.Println("⚠️ 未设置TEST_FOLDER_TOKEN环境变量，将尝试获取根目录信息")
+
+		// 尝试获取根目录信息
+		rootInfo, err := client.GetRootFolderInfo()
+		if err != nil {
+			fmt.Printf("❌ 获取根目录信息失败: %v\n", err)
+			return
+		}
+
+		fmt.Printf("✅ 成功获取根目录信息！\n")
+		fmt.Printf("📊 响应代码: %d\n", rootInfo.Code)
+		fmt.Printf("📄 消息: %s\n", rootInfo.Msg)
+		fmt.Printf("📁 文件夹数量: %d\n", len(rootInfo.Folders))
+
+		for i, folder := range rootInfo.Folders {
+			fmt.Printf("   %d. 文件夹名: %s\n", i+1, folder.FolderName)
+			fmt.Printf("      Token: %s\n", folder.FolderToken)
+		}
+		return
+	}
+
+	// 获取指定文件夹信息
+	folderDetail, err := client.GetFolderInfo(folderToken)
+	if err != nil {
+		fmt.Printf("❌ 获取文件夹信息失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ 成功获取文件夹信息！\n")
+	fmt.Printf("📊 响应代码: %d\n", folderDetail.Code)
+	fmt.Printf("📄 消息: %s\n", folderDetail.Msg)
+	fmt.Printf("📁 文件夹名: %s\n", folderDetail.Folder.FolderName)
+	fmt.Printf("🔑 文件夹Token: %s\n", folderDetail.Folder.FolderToken)
+
+	// 尝试获取文件夹下的文件列表
+	fmt.Println("\n📋 获取文件夹下的文件列表...")
+	fileList, err := client.GetFolderFiles(folderToken, 10, "")
+	if err != nil {
+		fmt.Printf("❌ 获取文件列表失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ 成功获取文件列表！\n")
+	fmt.Printf("📊 响应代码: %d\n", fileList.Code)
+	fmt.Printf("📄 消息: %s\n", fileList.Msg)
+	fmt.Printf("📁 文件数量: %d\n", len(fileList.Folders))
+
+	for i, file := range fileList.Folders {
+		fmt.Printf("   %d. 文件名: %s\n", i+1, file.FolderName)
+		fmt.Printf("      Token: %s\n", file.FolderToken)
+	}
 }
 
 func printJSON(title string, data interface{}) {
