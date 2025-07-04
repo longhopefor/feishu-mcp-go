@@ -340,33 +340,11 @@ func (c *Client) CreateDocument(folderToken, title string) (*Document, error) {
 
 // GetDocument 获取文档信息
 func (c *Client) GetDocument(documentID string) (*Document, error) {
-	endpoint := fmt.Sprintf("/docx/v1/documents/%s", documentID)
-
-	resp, err := c.Get(endpoint)
-	if err != nil {
-		return nil, fmt.Errorf("获取文档请求失败: %w", err)
-	}
-
-	var getResp GetDocumentResponse
-	if err := json.Unmarshal(resp.Body(), &getResp); err != nil {
-		return nil, fmt.Errorf("解析获取文档响应失败: %w", err)
-	}
-
-	if getResp.Code != 0 {
-		return nil, fmt.Errorf("获取文档失败 (code: %d): %s", getResp.Code, getResp.Msg)
-	}
-
-	return &getResp.Data.Document, nil
-}
-
-// GetDocumentContent 获取文档内容
-func (c *Client) GetDocumentContent(documentID string, lang int) (*DocumentContent, error) {
-	endpoint := fmt.Sprintf("/docx/v1/documents/%s/content", documentID)
-
-	// 构建查询参数
-	reqURL := c.baseURL + endpoint
-	if lang != 0 {
-		reqURL += fmt.Sprintf("?lang=%d", lang)
+	// 尝试多个可能的API端点
+	endpoints := []string{
+		fmt.Sprintf("/docx/v1/documents/%s", documentID),   // 标准文档端点
+		fmt.Sprintf("/drive/v1/files/%s", documentID),      // 云文档端点
+		fmt.Sprintf("/drive/v1/files/%s/meta", documentID), // 文档元信息端点
 	}
 
 	// 获取访问令牌
@@ -375,45 +353,166 @@ func (c *Client) GetDocumentContent(documentID string, lang int) (*DocumentConte
 		return nil, err
 	}
 
-	resp, err := c.client.R().
-		SetHeader("Authorization", "Bearer "+token).
-		Get(reqURL)
+	var lastErr error
 
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取文档请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var getResp GetDocumentResponse
+			if err := json.Unmarshal(resp.Body(), &getResp); err != nil {
+				lastErr = fmt.Errorf("解析获取文档响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if getResp.Code == 0 {
+				// 成功
+				return &getResp.Data.Document, nil
+			} else {
+				lastErr = fmt.Errorf("获取文档失败 (端点: %s, code: %d): %s", endpoint, getResp.Code, getResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
+	}
+
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
+	}
+
+	return nil, fmt.Errorf("获取文档失败: 所有端点都无法访问")
+}
+
+// GetDocumentContent 获取文档内容
+func (c *Client) GetDocumentContent(documentID string, lang int) (*DocumentContent, error) {
+	// 尝试多个可能的API端点
+	endpoints := []string{
+		fmt.Sprintf("/docx/v1/documents/%s/raw_content", documentID), // 原始内容端点
+		fmt.Sprintf("/drive/v1/files/%s/content", documentID),        // 云文档内容端点
+		fmt.Sprintf("/docx/v1/documents/%s/content", documentID),     // 原端点（备用）
+	}
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
 	if err != nil {
-		return nil, fmt.Errorf("获取文档内容请求失败: %w", err)
+		return nil, err
 	}
 
-	var contentResp GetDocumentContentResponse
-	if err := json.Unmarshal(resp.Body(), &contentResp); err != nil {
-		return nil, fmt.Errorf("解析文档内容响应失败: %w", err)
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		// 构建查询参数
+		reqURL := c.baseURL + endpoint
+		if lang != 0 {
+			reqURL += fmt.Sprintf("?lang=%d", lang)
+		}
+
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			Get(reqURL)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取文档内容请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var contentResp GetDocumentContentResponse
+			if err := json.Unmarshal(resp.Body(), &contentResp); err != nil {
+				lastErr = fmt.Errorf("解析文档内容响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if contentResp.Code == 0 {
+				// 成功
+				return &contentResp.Data, nil
+			} else {
+				lastErr = fmt.Errorf("获取文档内容失败 (端点: %s, code: %d): %s", endpoint, contentResp.Code, contentResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
 	}
 
-	if contentResp.Code != 0 {
-		return nil, fmt.Errorf("获取文档内容失败 (code: %d): %s", contentResp.Code, contentResp.Msg)
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
 	}
 
-	return &contentResp.Data, nil
+	return nil, fmt.Errorf("获取文档内容失败: 所有端点都无法访问")
 }
 
 // GetDocumentBlocks 获取文档块结构
 func (c *Client) GetDocumentBlocks(documentID string) ([]Block, error) {
-	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks", documentID)
+	// 尝试多个可能的API端点
+	endpoints := []string{
+		fmt.Sprintf("/docx/v1/documents/%s/blocks", documentID),     // 标准块结构端点
+		fmt.Sprintf("/drive/v1/files/%s/blocks", documentID),        // 云文档块端点
+		fmt.Sprintf("/docx/v1/documents/%s/raw_blocks", documentID), // 原始块端点
+	}
 
-	resp, err := c.Get(endpoint)
+	// 获取访问令牌
+	token, err := c.getAccessToken()
 	if err != nil {
-		return nil, fmt.Errorf("获取文档块结构请求失败: %w", err)
+		return nil, err
 	}
 
-	var blocksResp GetDocumentBlocksResponse
-	if err := json.Unmarshal(resp.Body(), &blocksResp); err != nil {
-		return nil, fmt.Errorf("解析文档块结构响应失败: %w", err)
+	var lastErr error
+
+	// 尝试不同的端点
+	for _, endpoint := range endpoints {
+		resp, err := c.client.R().
+			SetHeader("Authorization", "Bearer "+token).
+			Get(c.baseURL + endpoint)
+
+		if err != nil {
+			lastErr = fmt.Errorf("获取文档块结构请求失败 (端点: %s): %w", endpoint, err)
+			continue
+		}
+
+		// 如果状态码是200，尝试解析响应
+		if resp.StatusCode() == 200 {
+			var blocksResp GetDocumentBlocksResponse
+			if err := json.Unmarshal(resp.Body(), &blocksResp); err != nil {
+				lastErr = fmt.Errorf("解析文档块结构响应失败 (端点: %s): %w", endpoint, err)
+				continue
+			}
+
+			if blocksResp.Code == 0 {
+				// 成功
+				return blocksResp.Data.Blocks, nil
+			} else {
+				lastErr = fmt.Errorf("获取文档块结构失败 (端点: %s, code: %d): %s", endpoint, blocksResp.Code, blocksResp.Msg)
+				continue
+			}
+		} else {
+			lastErr = fmt.Errorf("API请求失败 (端点: %s, 状态码: %d): %s", endpoint, resp.StatusCode(), resp.String())
+			continue
+		}
 	}
 
-	if blocksResp.Code != 0 {
-		return nil, fmt.Errorf("获取文档块结构失败 (code: %d): %s", blocksResp.Code, blocksResp.Msg)
+	// 如果所有端点都失败，返回最后一个错误
+	if lastErr != nil {
+		return nil, lastErr
 	}
 
-	return blocksResp.Data.Blocks, nil
+	return nil, fmt.Errorf("获取文档块结构失败: 所有端点都无法访问")
 }
 
 // SearchDocuments 搜索文档
