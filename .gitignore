@@ -54,4 +54,6 @@ vendor/
 
 # Temporary files
 tmp/
-temp/
+temp/debug.env
+*.env
+.cursor/
