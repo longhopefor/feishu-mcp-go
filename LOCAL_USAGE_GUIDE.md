@@ -155,6 +155,14 @@ go run ./cmd/debug/main.go -app-id="$FEISHU_MCP_FEISHU_APP_ID" -app-secret="$FEI
 # 应该看到类似输出：
 # ✅ 成功获取访问令牌！
 # ✅ 令牌验证成功，可以正常访问飞书API！
+
+# 测试MCP协议连接
+./test_mcp_connection.sh
+
+# 应该看到输出包含：
+# ✅ initialize响应 - 协议版本和服务器能力
+# ✅ tools/list响应 - 21个可用工具列表
+# ✅ ping响应成功
 ```
 
 ### 3.3 测试工具功能
@@ -309,6 +317,17 @@ go run ./cmd/debug/main.go -app-id="你的ID" -app-secret="你的密钥" -action
 1. 检查飞书应用权限配置
 2. 确认应用已正确发布
 3. 检查用户是否在应用可见范围内
+```
+
+**❌ 问题4**: "JSON RPC Parse error"
+```bash
+# 原因：
+直接向MCP服务器发送随意输入会导致解析错误，这是正常现象
+
+# 解决方案：
+1. 使用正确的MCP协议初始化序列
+2. 运行测试脚本：./test_mcp_connection.sh
+3. 通过AI工具连接，而不是直接手动输入
 ```
 
 ### 调试模式

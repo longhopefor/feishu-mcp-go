@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 
@@ -115,6 +114,4 @@ func getRunMode(cmd *cobra.Command) string {
 	return "auto"
 }
 
-func init() {
-	flag.Parse()
-}
+// init 函数不需要调用 flag.Parse()，因为我们使用 Cobra 来处理命令行参数
