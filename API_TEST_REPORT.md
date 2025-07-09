@@ -122,14 +122,14 @@
 **配置文件**: debug.env
 ```bash
 # 飞书应用配置
-FEISHU_APP_ID=cli_a8edae5fb3fa901c
-FEISHU_APP_SECRET=3rpZ8ibgb4zkQidMkhNTPfhzCtJxCpLA
+FEISHU_APP_ID=test
+FEISHU_APP_SECRET=test
 FEISHU_BASE_URL=https://open.feishu.cn/open-apis
 
 # 测试资源
-TEST_FOLDER_TOKEN=fldcnZzKkKo7IXSJSKfljYRNcuh
-TEST_DOCUMENT_ID=GOZTdM1Yhox5YjxBHxbcHolxnlc
-TEST_BLOCK_ID=ST1xd02mPoCv9Txlbs1cW8yhnBf
+TEST_FOLDER_TOKEN=xxx
+TEST_DOCUMENT_ID=xxx
+TEST_BLOCK_ID=xxx
 ```
 
 **测试工具**: 
