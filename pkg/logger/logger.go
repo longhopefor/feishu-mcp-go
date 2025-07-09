@@ -44,8 +44,8 @@ func New(level string) Logger {
 		TimestampFormat: "2006-01-02 15:04:05",
 	})
 
-	// 设置输出目标
-	logger.SetOutput(os.Stdout)
+	// 设置输出目标 - 在MCP stdio模式下输出到stderr以避免污染JSON-RPC通信
+	logger.SetOutput(os.Stderr)
 
 	return &LogrusLogger{logger: logger}
 }

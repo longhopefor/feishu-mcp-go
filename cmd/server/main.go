@@ -71,11 +71,23 @@ func runServer(cmd *cobra.Command, args []string) {
 		log.Fatalf("配置加载失败: %v", err)
 	}
 
-	// 初始化日志
-	logger := logger.New(cfg.Log.Level)
-	logger.Info("启动 Feishu MCP Server",
-		"version", version,
-		"mode", getRunMode(cmd))
+	// 检查是否为stdio模式
+	isStdioMode, _ := cmd.Flags().GetBool("stdio")
+
+	// 初始化日志 - 在stdio模式下使用较少的日志以避免干扰MCP通信
+	logLevel := cfg.Log.Level
+	if isStdioMode && logLevel == "debug" {
+		logLevel = "warn" // 在stdio模式下降低日志级别
+	}
+
+	logger := logger.New(logLevel)
+
+	// 只在非stdio模式下输出启动信息，或者使用较少的日志
+	if !isStdioMode {
+		logger.Info("启动 Feishu MCP Server",
+			"version", version,
+			"mode", getRunMode(cmd))
+	}
 
 	// 验证飞书配置
 	if err := cfg.Feishu.Validate(); err != nil {
@@ -96,15 +108,21 @@ func runServer(cmd *cobra.Command, args []string) {
 		logger.Fatal("工具注册失败", "error", err)
 	}
 
-	logger.Info("所有飞书工具注册完成")
+	// 只在非stdio模式下输出详细信息
+	if !isStdioMode {
+		logger.Info("所有飞书工具注册完成")
+		logger.Info("Feishu MCP Server 启动中...")
+	}
 
 	// 启动服务器
-	logger.Info("Feishu MCP Server 启动中...")
 	if err := server.ServeStdio(s); err != nil {
 		logger.Fatal("服务器启动失败", "error", err)
 	}
 
-	logger.Info("Feishu MCP Server 已安全关闭")
+	// 只在非stdio模式下输出关闭信息
+	if !isStdioMode {
+		logger.Info("Feishu MCP Server 已安全关闭")
+	}
 }
 
 func getRunMode(cmd *cobra.Command) string {
