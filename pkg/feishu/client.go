@@ -84,18 +84,24 @@ type GetDocumentContentResponse struct {
 
 // Block 文档块结构
 type Block struct {
-	BlockID    string                 `json:"block_id"`
-	BlockType  string                 `json:"block_type"`
-	ParentID   string                 `json:"parent_id"`
-	Children   []string               `json:"children"`
-	Properties map[string]interface{} `json:"properties"`
+	BlockID   string                 `json:"block_id"`
+	BlockType int                    `json:"block_type"` // 修正：API返回的是数字，不是字符串
+	ParentID  string                 `json:"parent_id"`
+	Children  []string               `json:"children,omitempty"`
+	Page      map[string]interface{} `json:"page,omitempty"`    // 页面类型块的内容
+	Text      map[string]interface{} `json:"text,omitempty"`    // 文本类型块的内容
+	Code      map[string]interface{} `json:"code,omitempty"`    // 代码类型块的内容
+	Heading   map[string]interface{} `json:"heading,omitempty"` // 标题类型块的内容
+	List      map[string]interface{} `json:"list,omitempty"`    // 列表类型块的内容
 }
 
 // GetDocumentBlocksResponse 获取文档块响应
 type GetDocumentBlocksResponse struct {
 	BaseResponse
 	Data struct {
-		Blocks []Block `json:"blocks"`
+		Items     []Block `json:"items"` // 修正：API返回的字段名是items，不是blocks
+		HasMore   bool    `json:"has_more"`
+		PageToken string  `json:"page_token"`
 	} `json:"data"`
 }
 
@@ -145,6 +151,22 @@ type FolderDetailResponse struct {
 		FolderToken string `json:"folder_token"`
 		FolderName  string `json:"folder_name"`
 	} `json:"folder"`
+}
+
+// CreateFolderRequest 创建文件夹请求
+type CreateFolderRequest struct {
+	Name        string `json:"name"`
+	ParentToken string `json:"parent_token,omitempty"`
+}
+
+// CreateFolderResponse 创建文件夹响应
+type CreateFolderResponse struct {
+	BaseResponse
+	Data struct {
+		Token string `json:"token"`
+		Name  string `json:"name"`
+		URL   string `json:"url"`
+	} `json:"data"`
 }
 
 // WikiSpace 知识库空间结构
@@ -227,6 +249,79 @@ type GetWikiNodeMetaResponse struct {
 	Data struct {
 		Node WikiNodeMeta `json:"node"` // 修正：API返回的数据在data.node中
 	} `json:"data"`
+}
+
+// BlockContent 块内容
+type BlockContent struct {
+	BlockID   string                 `json:"block_id"`
+	BlockType int                    `json:"block_type"` // 修正：API返回的是数字
+	ParentID  string                 `json:"parent_id"`  // 添加父块ID
+	Children  []string               `json:"children,omitempty"`
+	Page      map[string]interface{} `json:"page,omitempty"`    // 页面类型块的内容
+	Text      map[string]interface{} `json:"text,omitempty"`    // 文本类型块的内容
+	Code      map[string]interface{} `json:"code,omitempty"`    // 代码类型块的内容
+	Heading   map[string]interface{} `json:"heading,omitempty"` // 标题类型块的内容
+	List      map[string]interface{} `json:"list,omitempty"`    // 列表类型块的内容
+}
+
+// GetBlockContentResponse 获取块内容响应
+type GetBlockContentResponse struct {
+	BaseResponse
+	Data struct {
+		Block BlockContent `json:"block"` // 修正：API返回的数据在data.block中
+	} `json:"data"`
+}
+
+// CreateBlockRequest 创建块请求
+type CreateBlockRequest struct {
+	BlockType string                 `json:"block_type"`
+	ParentID  string                 `json:"parent_id,omitempty"`
+	Content   map[string]interface{} `json:"content"`
+}
+
+// CreateBlockResponse 创建块响应
+type CreateBlockResponse struct {
+	BaseResponse
+	Data struct {
+		BlockID string `json:"block_id"`
+	} `json:"data"`
+}
+
+// BatchCreateBlocksRequest 批量创建块请求
+type BatchCreateBlocksRequest struct {
+	Blocks []CreateBlockRequest `json:"blocks"`
+}
+
+// BatchCreateBlocksResponse 批量创建块响应
+type BatchCreateBlocksResponse struct {
+	BaseResponse
+	Data struct {
+		BlockIDs []string `json:"block_ids"`
+	} `json:"data"`
+}
+
+// UpdateBlockRequest 更新块请求
+type UpdateBlockRequest struct {
+	Content map[string]interface{} `json:"content"`
+}
+
+// UpdateBlockResponse 更新块响应
+type UpdateBlockResponse struct {
+	BaseResponse
+	Data struct {
+		BlockID string `json:"block_id"`
+	} `json:"data"`
+}
+
+// DeleteBlocksRequest 删除块请求
+type DeleteBlocksRequest struct {
+	StartIndex int `json:"start_index"`
+	EndIndex   int `json:"end_index"`
+}
+
+// DeleteBlocksResponse 删除块响应
+type DeleteBlocksResponse struct {
+	BaseResponse
 }
 
 // NewClient 创建新的飞书客户端
@@ -578,7 +673,7 @@ func (c *Client) GetDocumentBlocks(documentID string) ([]Block, error) {
 
 			if blocksResp.Code == 0 {
 				// 成功
-				return blocksResp.Data.Blocks, nil
+				return blocksResp.Data.Items, nil
 			} else {
 				lastErr = fmt.Errorf("获取文档块结构失败 (端点: %s, code: %d): %s", endpoint, blocksResp.Code, blocksResp.Msg)
 				continue
@@ -768,6 +863,48 @@ func (c *Client) GetFolderFiles(folderToken string, pageSize int, pageToken stri
 	}
 
 	return &folderResp, nil
+}
+
+// CreateFolder 创建文件夹
+func (c *Client) CreateFolder(name, parentToken string) (*CreateFolderResponse, error) {
+	endpoint := "/drive/v1/folders"
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	// 构建请求体
+	requestBody := CreateFolderRequest{
+		Name:        name,
+		ParentToken: parentToken,
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetHeader("Content-Type", "application/json").
+		SetBody(requestBody).
+		Post(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("创建文件夹请求失败: %w", err)
+	}
+
+	if err := c.CheckResponse(resp); err != nil {
+		return nil, err
+	}
+
+	var createResp CreateFolderResponse
+	if err := json.Unmarshal(resp.Body(), &createResp); err != nil {
+		return nil, fmt.Errorf("解析创建文件夹响应失败: %w", err)
+	}
+
+	if createResp.Code != 0 {
+		return nil, fmt.Errorf("创建文件夹失败: %s", createResp.Msg)
+	}
+
+	return &createResp, nil
 }
 
 // ==================== 知识库相关方法 ====================
@@ -1030,4 +1167,413 @@ func (c *Client) GetWikiNodeMeta(spaceID, nodeToken string) (*WikiNodeMeta, erro
 	}
 
 	return nil, fmt.Errorf("获取知识库节点元信息失败: 所有端点都无法访问")
+}
+
+// GetBlockContent 获取特定块的详细内容
+func (c *Client) GetBlockContent(documentID, blockID string) (*BlockContent, error) {
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks/%s", documentID, blockID)
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取块内容请求失败: %w", err)
+	}
+
+	if err := c.CheckResponse(resp); err != nil {
+		return nil, err
+	}
+
+	var blockContentResp GetBlockContentResponse
+	if err := json.Unmarshal(resp.Body(), &blockContentResp); err != nil {
+		return nil, fmt.Errorf("解析块内容响应失败: %w", err)
+	}
+
+	if blockContentResp.Code != 0 {
+		return nil, fmt.Errorf("获取块内容失败: %s", blockContentResp.Msg)
+	}
+
+	return &blockContentResp.Data.Block, nil
+}
+
+// UpdateBlockText 更新块的文本内容
+func (c *Client) UpdateBlockText(documentID, blockID string, content map[string]interface{}) error {
+	token, err := c.getAccessToken()
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks/%s", documentID, blockID)
+
+	// 从content参数中提取文本内容
+	var textContent string
+	var hasValidContent bool
+
+	// 尝试从不同的字段中提取文本内容
+	if text, exists := content["text"]; exists {
+		// 如果text是字符串，直接使用
+		if textStr, ok := text.(string); ok {
+			textContent = textStr
+			hasValidContent = true
+		} else if textMap, ok := text.(map[string]interface{}); ok {
+			// 如果text是map，尝试从elements中提取内容
+			if elements, ok := textMap["elements"].([]interface{}); ok && len(elements) > 0 {
+				if element, ok := elements[0].(map[string]interface{}); ok {
+					if textRun, ok := element["text_run"].(map[string]interface{}); ok {
+						if content, ok := textRun["content"].(string); ok {
+							textContent = content
+							hasValidContent = true
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// 如果没有找到text字段，尝试content字段
+	if !hasValidContent {
+		if text, exists := content["content"]; exists {
+			if textStr, ok := text.(string); ok {
+				textContent = textStr
+				hasValidContent = true
+			} else {
+				return fmt.Errorf("content字段必须是字符串类型")
+			}
+		}
+	}
+
+	// 如果没有找到有效的文本内容，返回错误
+	if !hasValidContent {
+		return fmt.Errorf("content参数中必须包含有效的text或content字段")
+	}
+
+	// 使用update_text_elements字段来更新块内容
+	requestBody := map[string]interface{}{
+		"update_text_elements": map[string]interface{}{
+			"elements": []interface{}{
+				map[string]interface{}{
+					"text_run": map[string]interface{}{
+						"content": textContent,
+						"text_element_style": map[string]interface{}{
+							"bold":          false,
+							"inline_code":   false,
+							"italic":        false,
+							"strikethrough": false,
+							"underline":     false,
+						},
+					},
+				},
+			},
+			"style": map[string]interface{}{
+				"align":  1,
+				"folded": false,
+			},
+		},
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetHeader("Content-Type", "application/json").
+		SetBody(requestBody).
+		Patch(c.baseURL + endpoint)
+
+	if err != nil {
+		return fmt.Errorf("更新块内容请求失败: %w", err)
+	}
+
+	if err := c.CheckResponse(resp); err != nil {
+		return err
+	}
+
+	var updateResp UpdateBlockResponse
+	if err := json.Unmarshal(resp.Body(), &updateResp); err != nil {
+		return fmt.Errorf("解析更新响应失败: %w", err)
+	}
+
+	if updateResp.Code != 0 {
+		return fmt.Errorf("更新块内容失败: %s", updateResp.Msg)
+	}
+
+	return nil
+}
+
+// CreateBlock 创建单个块
+func (c *Client) CreateBlock(documentID string, blockType, parentID string, content map[string]interface{}) (string, error) {
+	token, err := c.getAccessToken()
+	if err != nil {
+		return "", err
+	}
+
+	// 尝试使用不同的API端点格式，在父块下创建子块
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks/%s/children", documentID, parentID)
+
+	// 创建最简单的文本块请求
+	blockTypeInt := 2 // 默认文本块类型
+	if blockType == "2" {
+		blockTypeInt = 2
+	}
+
+	createReq := map[string]interface{}{
+		"block_type": blockTypeInt,
+		"text":       content["text"],
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetHeader("Content-Type", "application/json").
+		SetBody(createReq).
+		Post(c.baseURL + endpoint)
+
+	if err != nil {
+		return "", fmt.Errorf("创建块请求失败: %w", err)
+	}
+
+	if err := c.CheckResponse(resp); err != nil {
+		return "", err
+	}
+
+	var createResp CreateBlockResponse
+	if err := json.Unmarshal(resp.Body(), &createResp); err != nil {
+		return "", fmt.Errorf("解析创建响应失败: %w", err)
+	}
+
+	if createResp.Code != 0 {
+		return "", fmt.Errorf("创建块失败: %s", createResp.Msg)
+	}
+
+	return createResp.Data.BlockID, nil
+}
+
+// BatchCreateBlocks 批量创建多个块
+func (c *Client) BatchCreateBlocks(documentID string, blocks []CreateBlockRequest) ([]string, error) {
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks/batch_create", documentID)
+	batchReq := BatchCreateBlocksRequest{
+		Blocks: blocks,
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetHeader("Content-Type", "application/json").
+		SetBody(batchReq).
+		Post(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("批量创建块请求失败: %w", err)
+	}
+
+	if err := c.CheckResponse(resp); err != nil {
+		return nil, err
+	}
+
+	var batchResp BatchCreateBlocksResponse
+	if err := json.Unmarshal(resp.Body(), &batchResp); err != nil {
+		return nil, fmt.Errorf("解析批量创建响应失败: %w", err)
+	}
+
+	if batchResp.Code != 0 {
+		return nil, fmt.Errorf("批量创建块失败: %s", batchResp.Msg)
+	}
+
+	return batchResp.Data.BlockIDs, nil
+}
+
+// CreateTextBlock 创建文本块
+func (c *Client) CreateTextBlock(documentID, parentID, text string, style map[string]interface{}) (string, error) {
+	// 使用完整的文本块结构
+	textContent := map[string]interface{}{
+		"elements": []interface{}{
+			map[string]interface{}{
+				"text_run": map[string]interface{}{
+					"content": text,
+					"text_element_style": map[string]interface{}{
+						"bold":          false,
+						"inline_code":   false,
+						"italic":        false,
+						"strikethrough": false,
+						"underline":     false,
+					},
+				},
+			},
+		},
+		"style": map[string]interface{}{
+			"align":  1,
+			"folded": false,
+		},
+	}
+
+	// 如果提供了样式参数，合并到文本样式中
+	if style != nil {
+		if textStyle, ok := textContent["style"].(map[string]interface{}); ok {
+			for k, v := range style {
+				textStyle[k] = v
+			}
+		}
+	}
+
+	content := map[string]interface{}{
+		"text": textContent,
+	}
+
+	return c.CreateBlock(documentID, "2", parentID, content)
+}
+
+// CreateCodeBlock 创建代码块
+func (c *Client) CreateCodeBlock(documentID, parentID, code, language string) (string, error) {
+	content := map[string]interface{}{
+		"code": code,
+	}
+	if language != "" {
+		content["language"] = language
+	}
+
+	return c.CreateBlock(documentID, "code", parentID, content)
+}
+
+// CreateHeadingBlock 创建标题块
+func (c *Client) CreateHeadingBlock(documentID, parentID, text string, level int) (string, error) {
+	content := map[string]interface{}{
+		"text":  text,
+		"level": level,
+	}
+
+	return c.CreateBlock(documentID, "heading", parentID, content)
+}
+
+// CreateListBlock 创建列表块
+func (c *Client) CreateListBlock(documentID, parentID string, items []string, listType string) (string, error) {
+	content := map[string]interface{}{
+		"items": items,
+		"type":  listType, // "ordered" 或 "unordered"
+	}
+
+	return c.CreateBlock(documentID, "list", parentID, content)
+}
+
+// DeleteBlocks 删除文档块
+func (c *Client) DeleteBlocks(documentID string, startIndex, endIndex int) error {
+	token, err := c.getAccessToken()
+	if err != nil {
+		return err
+	}
+
+	endpoint := fmt.Sprintf("/docx/v1/documents/%s/blocks/batch_delete", documentID)
+	deleteReq := DeleteBlocksRequest{
+		StartIndex: startIndex,
+		EndIndex:   endIndex,
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		SetHeader("Content-Type", "application/json").
+		SetBody(deleteReq).
+		Delete(c.baseURL + endpoint)
+
+	if err != nil {
+		return fmt.Errorf("删除块请求失败: %w", err)
+	}
+
+	if err := c.CheckResponse(resp); err != nil {
+		return err
+	}
+
+	var deleteResp DeleteBlocksResponse
+	if err := json.Unmarshal(resp.Body(), &deleteResp); err != nil {
+		return fmt.Errorf("解析删除响应失败: %w", err)
+	}
+
+	if deleteResp.Code != 0 {
+		return fmt.Errorf("删除块失败: %s", deleteResp.Msg)
+	}
+
+	return nil
+}
+
+// ConvertWiki API 相关结构
+type ConvertWikiRequest struct {
+	ObjToken string `json:"obj_token"`
+	ObjType  string `json:"obj_type"`
+}
+
+type ConvertWikiResponse struct {
+	Data *ConvertWikiData `json:"data"`
+	Code int              `json:"code"`
+	Msg  string           `json:"msg"`
+}
+
+type ConvertWikiData struct {
+	DocumentID string `json:"document_id"`
+	URL        string `json:"url"`
+	Token      string `json:"token"`
+}
+
+// GetImageResource API 相关结构
+type GetImageResourceRequest struct {
+	ImageKey string `json:"image_key"`
+}
+
+type GetImageResourceResponse struct {
+	Data *ImageResourceData `json:"data"`
+	Code int                `json:"code"`
+	Msg  string             `json:"msg"`
+}
+
+type ImageResourceData struct {
+	ImageKey    string `json:"image_key"`
+	URL         string `json:"url"`
+	ContentType string `json:"content_type"`
+	Size        int64  `json:"size"`
+	Base64Data  string `json:"base64_data,omitempty"`
+}
+
+// ConvertWiki 将飞书Wiki链接转换为文档ID
+func (c *Client) ConvertWiki(objToken string, objType string) (*ConvertWikiResponse, error) {
+	// 使用wiki API端点
+	endpoint := fmt.Sprintf("/wiki/v2/spaces/%s/nodes/%s", objToken, objToken)
+
+	resp, err := c.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("转换Wiki失败: %w", err)
+	}
+
+	var response ConvertWikiResponse
+	if err := json.Unmarshal(resp.Body(), &response); err != nil {
+		return nil, fmt.Errorf("解析转换Wiki响应失败: %w", err)
+	}
+
+	if response.Code != 0 {
+		return nil, fmt.Errorf("转换Wiki失败: code=%d, msg=%s", response.Code, response.Msg)
+	}
+
+	return &response, nil
+}
+
+// GetImageResource 获取飞书图片资源
+func (c *Client) GetImageResource(imageKey string) (*GetImageResourceResponse, error) {
+	endpoint := fmt.Sprintf("/im/v1/images/%s", imageKey)
+
+	resp, err := c.Get(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("获取图片资源失败: %w", err)
+	}
+
+	var response GetImageResourceResponse
+	if err := json.Unmarshal(resp.Body(), &response); err != nil {
+		return nil, fmt.Errorf("解析图片资源响应失败: %w", err)
+	}
+
+	if response.Code != 0 {
+		return nil, fmt.Errorf("获取图片资源失败: code=%d, msg=%s", response.Code, response.Msg)
+	}
+
+	return &response, nil
 }
