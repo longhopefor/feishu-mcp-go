@@ -268,6 +268,67 @@ case "$ACTION" in
         echo "ℹ️ 测试获取知识库节点元信息: $SPACE_ID / $NODE_TOKEN"
         ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=wiki-meta -space-id="$SPACE_ID" -node-token="$NODE_TOKEN" $DEBUG_FLAG $VERBOSE_FLAG
         ;;
+    "drive-files-meta")
+        echo "☁️ 测试获取云空间文件详细信息..."
+        FOLDER_TOKEN="${1:-}"
+        PAGE_SIZE="${2:-50}"
+        PAGE_TOKEN="${3:-}"
+        ARGS=""
+        if [ -n "$FOLDER_TOKEN" ]; then
+            ARGS="$ARGS -folder-token=\"$FOLDER_TOKEN\""
+        fi
+        if [ -n "$PAGE_TOKEN" ]; then
+            ARGS="$ARGS -page-token=\"$PAGE_TOKEN\""
+        fi
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=drive-files-meta -page-size="$PAGE_SIZE" $ARGS $DEBUG_FLAG $VERBOSE_FLAG
+        ;;
+    "drive-meta")
+        FILE_TOKEN="${1:-}"
+        if [ -z "$FILE_TOKEN" ]; then
+            echo "❌ 请提供 file_token 参数"
+            echo "用法: $0 drive-meta <file_token>"
+            exit 1
+        fi
+        echo "☁️ 测试获取云空间文件元数据: $FILE_TOKEN"
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=drive-meta -folder-token="$FILE_TOKEN" $DEBUG_FLAG $VERBOSE_FLAG
+        ;;
+    "all-drive-files")
+        echo "☁️ 测试获取目录下所有文件..."
+        FOLDER_TOKEN="${1:-}"
+        MAX_FILES="${2:-100}"
+        ARGS=""
+        if [ -n "$FOLDER_TOKEN" ]; then
+            ARGS="$ARGS -folder-token=\"$FOLDER_TOKEN\""
+        fi
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=all-drive-files -page-size="$MAX_FILES" $ARGS $DEBUG_FLAG $VERBOSE_FLAG
+        ;;
+    "root-folder-meta")
+        echo "☁️ 测试获取根文件夹元数据（使用新的API端点）..."
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=root-folder-meta $DEBUG_FLAG $VERBOSE_FLAG
+        ;;
+    "image-resource")
+        IMAGE_KEY="${1:-}"
+        if [ -z "$IMAGE_KEY" ]; then
+            echo "❌ 请提供 image_key 参数"
+            echo "用法: $0 image-resource <image_key>"
+            exit 1
+        fi
+        echo "🖼️ 测试获取图片资源: $IMAGE_KEY"
+        echo "⚠️ 注意：此功能需要在debug工具中实现image-resource命令"
+        echo "目前仅支持通过MCP工具调用"
+        ;;
+    "convert-wiki")
+        OBJ_TOKEN="${1:-}"
+        OBJ_TYPE="${2:-doc}"
+        if [ -z "$OBJ_TOKEN" ]; then
+            echo "❌ 请提供 obj_token 参数"
+            echo "用法: $0 convert-wiki <obj_token> [obj_type]"
+            exit 1
+        fi
+        echo "🔄 测试Wiki转换: $OBJ_TOKEN (类型: $OBJ_TYPE)"
+        echo "⚠️ 注意：此功能需要在debug工具中实现convert-wiki命令"
+        echo "目前仅支持通过MCP工具调用"
+        ;;
     "all")
         echo "🚀 运行所有API测试..."
         echo ""
@@ -326,16 +387,34 @@ case "$ACTION" in
         ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=folder-info $DEBUG_FLAG $VERBOSE_FLAG
         echo ""
         
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "☁️ 8.1 测试获取根文件夹元数据（新API端点）"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=root-folder-meta $DEBUG_FLAG $VERBOSE_FLAG
+        echo ""
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "☁️ 8.2 测试获取云空间文件详细信息"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=drive-files-meta -page-size=20 $DEBUG_FLAG $VERBOSE_FLAG
+        echo ""
+        
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        echo "☁️ 8.3 测试获取目录下所有文件"
+        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=all-drive-files -page-size=20 $DEBUG_FLAG $VERBOSE_FLAG
+        echo ""
+        
         # 内容操作工具测试
         if [ -n "$TEST_DOCUMENT_ID" ] && [ -n "$TEST_BLOCK_ID" ]; then
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "🧱 9. 测试获取块内容"
+            echo "🧱 12. 测试获取块内容"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=get-block -doc-id="$TEST_DOCUMENT_ID" -block-id="$TEST_BLOCK_ID" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
             
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "✏️ 10. 测试更新块文本"
+            echo "✏️ 13. 测试更新块文本"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=update-block -doc-id="$TEST_DOCUMENT_ID" -block-id="$TEST_BLOCK_ID" -content="自动测试更新的内容" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
@@ -345,31 +424,31 @@ case "$ACTION" in
         
         if [ -n "$TEST_DOCUMENT_ID" ]; then
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📝 11. 测试创建文本块"
+            echo "📝 14. 测试创建文本块"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=create-text -doc-id="$TEST_DOCUMENT_ID" -parent-id="$TEST_PARENT_BLOCK_ID" -content="自动测试创建的文本块" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
             
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "💻 12. 测试创建代码块"
+            echo "💻 15. 测试创建代码块"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=create-code -doc-id="$TEST_DOCUMENT_ID" -parent-id="$TEST_PARENT_BLOCK_ID" -code="console.log('自动测试代码块');" -language="javascript" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
             
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📋 13. 测试创建标题块"
+            echo "📋 16. 测试创建标题块"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=create-heading -doc-id="$TEST_DOCUMENT_ID" -parent-id="$TEST_PARENT_BLOCK_ID" -content="自动测试标题" -level="2" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
             
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📃 14. 测试创建列表块"
+            echo "📃 17. 测试创建列表块"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=create-list -doc-id="$TEST_DOCUMENT_ID" -parent-id="$TEST_PARENT_BLOCK_ID" -items="测试项目1,测试项目2,测试项目3" -list-type="bullet" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
             
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📦 15. 测试批量创建块"
+            echo "📦 18. 测试批量创建块"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=batch-create -doc-id="$TEST_DOCUMENT_ID" -parent-id="$TEST_PARENT_BLOCK_ID" $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
@@ -379,7 +458,7 @@ case "$ACTION" in
         
         if [ -n "$TEST_DOCUMENT_ID" ]; then
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "🗑️ 16. 测试删除文档块 (谨慎操作)"
+            echo "🗑️ 19. 测试删除文档块 (谨慎操作)"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             echo "⚠️ 注意：此操作会删除文档中的块，请确保测试文档可以被修改"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=delete-blocks -doc-id="$TEST_DOCUMENT_ID" -start-index="0" -end-index="0" $DEBUG_FLAG $VERBOSE_FLAG
@@ -388,27 +467,27 @@ case "$ACTION" in
         
         # 知识库操作测试
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "📚 17. 测试获取知识库空间列表"
+        echo "📚 20. 测试获取知识库空间列表"
         echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
         ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=wiki-spaces -page-size=20 $DEBUG_FLAG $VERBOSE_FLAG
         echo ""
         
         if [ -n "$TEST_WIKI_SPACE_ID" ]; then
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "📁 18. 测试获取知识库节点列表"
+            echo "📁 21. 测试获取知识库节点列表"
             echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
             ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=wiki-nodes -space-id="$TEST_WIKI_SPACE_ID" -page-size=20 $DEBUG_FLAG $VERBOSE_FLAG
             echo ""
             
             if [ -n "$TEST_WIKI_NODE_TOKEN" ]; then
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "📖 19. 测试获取知识库节点内容"
+                echo "📖 22. 测试获取知识库节点内容"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=wiki-content -space-id="$TEST_WIKI_SPACE_ID" -node-token="$TEST_WIKI_NODE_TOKEN" -lang=0 $DEBUG_FLAG $VERBOSE_FLAG
                 echo ""
                 
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "ℹ️ 20. 测试获取知识库节点元信息"
+                echo "ℹ️ 23. 测试获取知识库节点元信息"
                 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
                 ./build/debug -app-id="$APP_ID" -app-secret="$APP_SECRET" -base-url="$BASE_URL" -action=wiki-meta -space-id="$TEST_WIKI_SPACE_ID" -node-token="$TEST_WIKI_NODE_TOKEN" $DEBUG_FLAG $VERBOSE_FLAG
                 echo ""
@@ -449,11 +528,19 @@ case "$ACTION" in
         echo "文件夹操作:"
         echo "  folder-info - 测试获取文件夹信息"
         echo "  folder      - 测试获取文件夹信息(别名)"
+        echo "云空间操作:"
+        echo "  drive-files-meta  - 测试获取云空间文件详细信息 [folder_token] [page_size] [page_token]"
+        echo "  drive-meta        - 测试获取云空间文件元数据 <file_token>"
+        echo "  all-drive-files   - 测试获取目录下所有文件 [folder_token] [max_files]"
+        echo "  root-folder-meta  - 测试获取根文件夹元数据（使用新的API端点）"
         echo "知识库操作:"
         echo "  wiki-spaces - 测试获取知识库空间列表 [page_size] [page_token]"
         echo "  wiki-nodes  - 测试获取知识库节点列表 <space_id> [page_size] [parent_node]"
         echo "  wiki-content- 测试获取知识库节点内容 <space_id> <node_token> [lang]"
         echo "  wiki-meta   - 测试获取知识库节点元信息 <space_id> <node_token>"
+        echo "工具功能:"
+        echo "  image-resource - 测试获取图片资源 <image_key>"
+        echo "  convert-wiki   - 测试Wiki转换 <obj_token> [obj_type]"
         echo "综合测试:"
         echo "  all         - 运行所有API测试"
         echo ""
@@ -475,10 +562,20 @@ case "$ACTION" in
         echo "  $0 create-code-block doc_id_123 parent_id_789 'console.log(\"Hello\");' javascript"
         echo "  $0 create-heading-block doc_id_123 parent_id_789 '标题文本' 2"
         echo "  $0 create-list-block doc_id_123 parent_id_789 '项目1,项目2,项目3' bullet"
+        echo "云空间操作:"
+        echo "  $0 root-folder-meta"
+        echo "  $0 drive-files-meta"
+        echo "  $0 drive-files-meta folder_token_123 50 page_token_456"
+        echo "  $0 drive-meta file_token_123"
+        echo "  $0 all-drive-files"
+        echo "  $0 all-drive-files folder_token_123 100"
         echo "知识库操作:"
         echo "  $0 wiki-spaces"
         echo "  $0 wiki-nodes 7523019799962943492"
         echo "  $0 wiki-content 7523019799962943492 token123"
+        echo "工具功能:"
+        echo "  $0 image-resource image_key_123"
+        echo "  $0 convert-wiki obj_token_123 doc"
         echo "综合测试:"
         echo "  $0 all"
         exit 1

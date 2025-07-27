@@ -41,6 +41,42 @@ func NewCreateFolderTool(feishu *feishu.Client, logger logger.Logger) server.Ser
 	return server.ServerTool{Tool: tool, Handler: handler}
 }
 
+func NewGetDriveFilesWithMetaTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
+	tool := mcp.NewTool("get_feishu_drive_files_with_meta",
+		mcp.WithDescription("获取云空间目录下所有文件的详细元数据信息"))
+	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return getDriveFilesWithMeta(feishu, logger, request)
+	}
+	return server.ServerTool{Tool: tool, Handler: handler}
+}
+
+func NewGetDriveMetaTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
+	tool := mcp.NewTool("get_feishu_drive_meta",
+		mcp.WithDescription("获取云空间目录/文件的元数据信息"))
+	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return getDriveMeta(feishu, logger, request)
+	}
+	return server.ServerTool{Tool: tool, Handler: handler}
+}
+
+func NewGetAllDriveFilesTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
+	tool := mcp.NewTool("get_all_feishu_drive_files",
+		mcp.WithDescription("获取指定目录下所有文件（支持分页和数量限制）"))
+	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return getAllDriveFiles(feishu, logger, request)
+	}
+	return server.ServerTool{Tool: tool, Handler: handler}
+}
+
+func NewGetRootFolderMetaTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
+	tool := mcp.NewTool("get_feishu_root_folder_meta",
+		mcp.WithDescription("获取云空间根文件夹元数据信息（使用新的API端点）"))
+	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		return getRootFolderMeta(feishu, logger, request)
+	}
+	return server.ServerTool{Tool: tool, Handler: handler}
+}
+
 // getRootFolderInfo 获取根文件夹信息实现
 func getRootFolderInfo(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	logger.Info("开始获取根文件夹信息", "name", request.Params.Name)
@@ -52,17 +88,10 @@ func getRootFolderInfo(feishu *feishu.Client, logger logger.Logger, request mcp.
 		return nil, fmt.Errorf("获取根文件夹信息失败: %w", err)
 	}
 
-	logger.Info("获取根文件夹信息成功", "folders_count", len(folderInfo.Folders))
+	logger.Info("获取根文件夹信息成功", "files_count", len(folderInfo.Data.Files))
 
-	// 构建成功响应
-	result := map[string]interface{}{
-		"success":       true,
-		"message":       "获取根文件夹信息成功",
-		"folders_count": len(folderInfo.Folders),
-		"folders":       folderInfo.Folders,
-	}
-
-	resultContent, _ := json.MarshalIndent(result, "", "  ")
+	// 直接返回原始结构体内容，保证与飞书官方API一致
+	resultContent, _ := json.MarshalIndent(folderInfo, "", "  ")
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
@@ -119,15 +148,16 @@ func getFolderFiles(feishu *feishu.Client, logger logger.Logger, request mcp.Cal
 		return nil, fmt.Errorf("获取文件夹文件列表失败: %w", err)
 	}
 
-	logger.Info("获取文件夹文件列表成功", "folderToken", folderToken, "files_count", len(folderFiles.Folders))
+	logger.Info("获取文件夹文件列表成功", "folderToken", folderToken, "files_count", len(folderFiles.Data.Files))
 
 	// 构建成功响应
 	result := map[string]interface{}{
 		"success":     true,
 		"message":     "获取文件夹文件列表成功",
 		"folderToken": folderToken,
-		"files_count": len(folderFiles.Folders),
-		"files":       folderFiles.Folders,
+		"files_count": len(folderFiles.Data.Files),
+		"files":       folderFiles.Data.Files,
+		"has_more":    folderFiles.Data.HasMore,
 		"pageSize":    pageSize,
 		"pageToken":   pageToken,
 	}
@@ -194,6 +224,224 @@ func createFolder(feishu *feishu.Client, logger logger.Logger, request mcp.CallT
 	}
 
 	resultContent, _ := json.MarshalIndent(result, "", "  ")
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(resultContent),
+			},
+		},
+	}, nil
+}
+
+// getDriveFilesWithMeta 获取云空间目录下所有文件的详细元数据信息实现
+func getDriveFilesWithMeta(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Info("开始获取云空间文件详细元数据", "name", request.Params.Name)
+
+	// 解析参数
+	var args map[string]interface{}
+	if request.Params.Arguments != nil {
+		if argBytes, ok := request.Params.Arguments.([]byte); ok {
+			if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		} else if argMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			args = argMap
+		} else {
+			if argBytes, err := json.Marshal(request.Params.Arguments); err != nil {
+				return nil, fmt.Errorf("参数格式错误: %w", err)
+			} else if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		}
+	}
+
+	// 获取参数
+	folderToken := ""
+	if ft, ok := args["folderToken"].(string); ok {
+		folderToken = ft
+	}
+
+	pageSize := 50 // 默认值
+	if ps, ok := args["pageSize"].(float64); ok {
+		pageSize = int(ps)
+	}
+
+	pageToken := ""
+	if pt, ok := args["pageToken"].(string); ok {
+		pageToken = pt
+	}
+
+	// 调用飞书API获取文件详细信息
+	filesResp, err := feishu.GetDriveFilesWithMeta(folderToken, pageSize, pageToken)
+	if err != nil {
+		logger.Error("获取云空间文件详细元数据失败", "error", err)
+		return nil, fmt.Errorf("获取云空间文件详细元数据失败: %w", err)
+	}
+
+	logger.Info("获取云空间文件详细元数据成功", "folderToken", folderToken, "files_count", len(filesResp.Data.Files))
+
+	// 构建成功响应
+	result := map[string]interface{}{
+		"success":       true,
+		"message":       "获取云空间文件详细元数据成功",
+		"folderToken":   folderToken,
+		"files_count":   len(filesResp.Data.Files),
+		"files":         filesResp.Data.Files,
+		"pageSize":      pageSize,
+		"pageToken":     pageToken,
+		"nextPageToken": filesResp.Data.NextPageToken,
+		"hasMore":       filesResp.Data.HasMore,
+	}
+
+	resultContent, _ := json.MarshalIndent(result, "", "  ")
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(resultContent),
+			},
+		},
+	}, nil
+}
+
+// getDriveMeta 获取云空间目录/文件的元数据信息实现
+func getDriveMeta(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Info("开始获取云空间文件元数据", "name", request.Params.Name)
+
+	// 解析参数
+	var args map[string]interface{}
+	if request.Params.Arguments != nil {
+		if argBytes, ok := request.Params.Arguments.([]byte); ok {
+			if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		} else if argMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			args = argMap
+		} else {
+			if argBytes, err := json.Marshal(request.Params.Arguments); err != nil {
+				return nil, fmt.Errorf("参数格式错误: %w", err)
+			} else if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		}
+	}
+
+	fileToken, ok := args["fileToken"].(string)
+	if !ok || fileToken == "" {
+		return nil, fmt.Errorf("fileToken参数必须是非空字符串")
+	}
+
+	// 调用飞书API获取文件元数据
+	metaResp, err := feishu.GetDriveMeta(fileToken)
+	if err != nil {
+		logger.Error("获取云空间文件元数据失败", "error", err)
+		return nil, fmt.Errorf("获取云空间文件元数据失败: %w", err)
+	}
+
+	logger.Info("获取云空间文件元数据成功", "fileToken", fileToken, "name", metaResp.Data.Name)
+
+	// 构建成功响应
+	result := map[string]interface{}{
+		"success":   true,
+		"message":   "获取云空间文件元数据成功",
+		"fileToken": fileToken,
+		"meta":      metaResp.Data,
+	}
+
+	resultContent, _ := json.MarshalIndent(result, "", "  ")
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(resultContent),
+			},
+		},
+	}, nil
+}
+
+// getAllDriveFiles 获取指定目录下所有文件（支持分页和数量限制）实现
+func getAllDriveFiles(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Info("开始获取目录下所有文件", "name", request.Params.Name)
+
+	// 解析参数
+	var args map[string]interface{}
+	if request.Params.Arguments != nil {
+		if argBytes, ok := request.Params.Arguments.([]byte); ok {
+			if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		} else if argMap, ok := request.Params.Arguments.(map[string]interface{}); ok {
+			args = argMap
+		} else {
+			if argBytes, err := json.Marshal(request.Params.Arguments); err != nil {
+				return nil, fmt.Errorf("参数格式错误: %w", err)
+			} else if err := json.Unmarshal(argBytes, &args); err != nil {
+				return nil, fmt.Errorf("解析参数失败: %w", err)
+			}
+		}
+	}
+
+	// 获取参数
+	folderToken := ""
+	if ft, ok := args["folderToken"].(string); ok {
+		folderToken = ft
+	}
+
+	maxFiles := 0 // 默认无限制
+	if mf, ok := args["maxFiles"].(float64); ok {
+		maxFiles = int(mf)
+	}
+
+	// 调用飞书API获取所有文件
+	allFiles, err := feishu.GetAllDriveFiles(folderToken, maxFiles)
+	if err != nil {
+		logger.Error("获取目录下所有文件失败", "error", err)
+		return nil, fmt.Errorf("获取目录下所有文件失败: %w", err)
+	}
+
+	logger.Info("获取目录下所有文件成功", "folderToken", folderToken, "files_count", len(allFiles))
+
+	// 构建成功响应
+	result := map[string]interface{}{
+		"success":     true,
+		"message":     "获取目录下所有文件成功",
+		"folderToken": folderToken,
+		"files_count": len(allFiles),
+		"files":       allFiles,
+		"maxFiles":    maxFiles,
+	}
+
+	resultContent, _ := json.MarshalIndent(result, "", "  ")
+
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			mcp.TextContent{
+				Type: "text",
+				Text: string(resultContent),
+			},
+		},
+	}, nil
+}
+
+// getRootFolderMeta 获取根文件夹元数据实现（使用新的API端点）
+func getRootFolderMeta(feishu *feishu.Client, logger logger.Logger, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	logger.Info("开始获取根文件夹元数据", "name", request.Params.Name)
+
+	// 调用飞书API获取根文件夹元数据
+	metaResp, err := feishu.GetRootFolderMeta()
+	if err != nil {
+		logger.Error("获取根文件夹元数据失败", "error", err)
+		return nil, fmt.Errorf("获取根文件夹元数据失败: %w", err)
+	}
+
+	logger.Info("获取根文件夹元数据成功", "token", metaResp.Data.Token, "id", metaResp.Data.ID)
+
+	// 直接返回原始结构体内容，保证与飞书官方API一致
+	resultContent, _ := json.MarshalIndent(metaResp, "", "  ")
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{

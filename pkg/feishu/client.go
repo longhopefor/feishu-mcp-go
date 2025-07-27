@@ -134,13 +134,83 @@ type SearchDocumentsResponse struct {
 }
 
 // FolderInfoResponse 文件夹信息响应
+// FileInfo 文件信息结构体
+type FileInfo struct {
+	Name         string                 `json:"name"`
+	ParentToken  string                 `json:"parent_token"`
+	Token        string                 `json:"token"`
+	Type         string                 `json:"type"`
+	CreatedTime  string                 `json:"created_time"`
+	ModifiedTime string                 `json:"modified_time"`
+	OwnerID      string                 `json:"owner_id"`
+	URL          string                 `json:"url"`
+	ShortcutInfo map[string]interface{} `json:"shortcut_info,omitempty"`
+}
+
+// FolderInfoResponse 获取文件夹信息响应（修正为匹配飞书API实际响应格式）
 type FolderInfoResponse struct {
-	Code    int    `json:"code"`
-	Msg     string `json:"msg"`
-	Folders []struct {
-		FolderToken string `json:"folder_token"`
-		FolderName  string `json:"folder_name"`
-	} `json:"folders"`
+	Code int    `json:"code"`
+	Msg  string `json:"msg"`
+	Data struct {
+		Files   []FileInfo `json:"files"`
+		HasMore bool       `json:"has_more"`
+	} `json:"data"`
+}
+
+// DriveFile 云空间文件信息
+type DriveFile struct {
+	Token        string `json:"token"`
+	Name         string `json:"name"`
+	Type         string `json:"type"` // file, folder
+	ParentToken  string `json:"parent_token"`
+	URL          string `json:"url"`
+	Size         int64  `json:"size,omitempty"`
+	CreatedTime  string `json:"created_time"`
+	ModifiedTime string `json:"modified_time"`
+	OwnerID      string `json:"owner_id"`
+	Creator      string `json:"creator"`
+	Thumbnail    string `json:"thumbnail,omitempty"`
+	MimeType     string `json:"mime_type,omitempty"`
+}
+
+// GetDriveFilesResponse 获取云空间文件列表响应
+type GetDriveFilesResponse struct {
+	BaseResponse
+	Data struct {
+		Files         []DriveFile `json:"files"`
+		NextPageToken string      `json:"next_page_token"`
+		HasMore       bool        `json:"has_more"`
+	} `json:"data"`
+}
+
+// GetDriveMetaResponse 获取云空间目录元数据响应
+type GetDriveMetaResponse struct {
+	BaseResponse
+	Data struct {
+		Token        string `json:"token"`
+		Name         string `json:"name"`
+		Type         string `json:"type"`
+		ParentToken  string `json:"parent_token"`
+		URL          string `json:"url"`
+		Size         int64  `json:"size,omitempty"`
+		CreatedTime  string `json:"created_time"`
+		ModifiedTime string `json:"modified_time"`
+		OwnerID      string `json:"owner_id"`
+		Creator      string `json:"creator"`
+	} `json:"data"`
+}
+
+// RootFolderMeta 根文件夹元数据（修正为匹配实际API响应）
+type RootFolderMeta struct {
+	Token  string `json:"token"`
+	ID     string `json:"id"`
+	UserID string `json:"user_id"`
+}
+
+// GetRootFolderMetaResponse 获取根文件夹元数据响应
+type GetRootFolderMetaResponse struct {
+	BaseResponse
+	Data RootFolderMeta `json:"data"`
 }
 
 // FolderDetailResponse 文件夹详细信息响应
@@ -763,7 +833,7 @@ func (c *Client) SearchDocuments(searchKey string, pageSize int, pageToken strin
 	return nil, fmt.Errorf("搜索文档失败: 所有端点都无法访问")
 }
 
-// GetRootFolderInfo 获取根目录信息
+// GetRootFolderInfo 获取根目录信息（修正为匹配飞书API实际响应格式）
 func (c *Client) GetRootFolderInfo() (*FolderInfoResponse, error) {
 	endpoint := "/drive/v1/files"
 
@@ -776,7 +846,7 @@ func (c *Client) GetRootFolderInfo() (*FolderInfoResponse, error) {
 	resp, err := c.client.R().
 		SetHeader("Authorization", "Bearer "+token).
 		SetQueryParam("folder_token", ""). // 空值表示根目录
-		SetQueryParam("page_size", "10").
+		SetQueryParam("page_size", "50").  // 增加页面大小以获取更多文件
 		Get(c.baseURL + endpoint)
 
 	if err != nil {
@@ -793,6 +863,36 @@ func (c *Client) GetRootFolderInfo() (*FolderInfoResponse, error) {
 	}
 
 	return &folderResp, nil
+}
+
+// GetRootFolderMeta 获取根文件夹元数据（使用新的API端点）
+func (c *Client) GetRootFolderMeta() (*GetRootFolderMetaResponse, error) {
+	endpoint := "/drive/explorer/v2/root_folder/meta"
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, fmt.Errorf("获取访问令牌失败: %w", err)
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取根文件夹元数据失败: %w", err)
+	}
+
+	var metaResp GetRootFolderMetaResponse
+	if err := json.Unmarshal(resp.Body(), &metaResp); err != nil {
+		return nil, fmt.Errorf("解析根文件夹元数据响应失败: %w", err)
+	}
+
+	if metaResp.Code != 0 {
+		return nil, fmt.Errorf("获取根文件夹元数据失败 (code: %d): %s", metaResp.Code, metaResp.Msg)
+	}
+
+	return &metaResp, nil
 }
 
 // GetFolderInfo 获取指定文件夹信息
@@ -863,6 +963,119 @@ func (c *Client) GetFolderFiles(folderToken string, pageSize int, pageToken stri
 	}
 
 	return &folderResp, nil
+}
+
+// GetDriveFilesWithMeta 获取云空间目录下所有文件的详细信息
+func (c *Client) GetDriveFilesWithMeta(folderToken string, pageSize int, pageToken string) (*GetDriveFilesResponse, error) {
+	endpoint := "/drive/v1/files"
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, fmt.Errorf("获取访问令牌失败: %w", err)
+	}
+
+	req := c.client.R().
+		SetHeader("Authorization", "Bearer "+token)
+
+	// 设置查询参数
+	if folderToken != "" {
+		req.SetQueryParam("folder_token", folderToken)
+	}
+	if pageSize > 0 {
+		req.SetQueryParam("page_size", fmt.Sprintf("%d", pageSize))
+	} else {
+		req.SetQueryParam("page_size", "50") // 默认分页大小
+	}
+	if pageToken != "" {
+		req.SetQueryParam("page_token", pageToken)
+	}
+
+	// 设置返回字段，获取文件的详细元数据
+	req.SetQueryParam("fields", "name,type,parent_token,url,size,created_time,modified_time,owner_id,creator")
+
+	resp, err := req.Get(c.baseURL + endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("获取云空间文件列表失败: %w", err)
+	}
+
+	var filesResp GetDriveFilesResponse
+	if err := json.Unmarshal(resp.Body(), &filesResp); err != nil {
+		return nil, fmt.Errorf("解析云空间文件列表响应失败: %w", err)
+	}
+
+	if filesResp.Code != 0 {
+		return nil, fmt.Errorf("获取云空间文件列表失败 (code: %d): %s", filesResp.Code, filesResp.Msg)
+	}
+
+	return &filesResp, nil
+}
+
+// GetDriveMeta 获取云空间目录/文件的元数据信息
+func (c *Client) GetDriveMeta(fileToken string) (*GetDriveMetaResponse, error) {
+	endpoint := fmt.Sprintf("/drive/v1/files/%s/meta", fileToken)
+
+	// 获取访问令牌
+	token, err := c.getAccessToken()
+	if err != nil {
+		return nil, fmt.Errorf("获取访问令牌失败: %w", err)
+	}
+
+	resp, err := c.client.R().
+		SetHeader("Authorization", "Bearer "+token).
+		Get(c.baseURL + endpoint)
+
+	if err != nil {
+		return nil, fmt.Errorf("获取云空间文件元数据失败: %w", err)
+	}
+
+	var metaResp GetDriveMetaResponse
+	if err := json.Unmarshal(resp.Body(), &metaResp); err != nil {
+		return nil, fmt.Errorf("解析云空间文件元数据响应失败: %w", err)
+	}
+
+	if metaResp.Code != 0 {
+		return nil, fmt.Errorf("获取云空间文件元数据失败 (code: %d): %s", metaResp.Code, metaResp.Msg)
+	}
+
+	return &metaResp, nil
+}
+
+// GetAllDriveFiles 获取指定目录下所有文件（递归获取，支持分页）
+func (c *Client) GetAllDriveFiles(folderToken string, maxFiles int) ([]DriveFile, error) {
+	var allFiles []DriveFile
+	pageToken := ""
+	pageSize := 50
+
+	if maxFiles > 0 && maxFiles < pageSize {
+		pageSize = maxFiles
+	}
+
+	for {
+		resp, err := c.GetDriveFilesWithMeta(folderToken, pageSize, pageToken)
+		if err != nil {
+			return nil, fmt.Errorf("获取文件列表失败: %w", err)
+		}
+
+		allFiles = append(allFiles, resp.Data.Files...)
+
+		// 检查是否达到最大文件数限制
+		if maxFiles > 0 && len(allFiles) >= maxFiles {
+			if len(allFiles) > maxFiles {
+				allFiles = allFiles[:maxFiles]
+			}
+			break
+		}
+
+		// 检查是否还有更多数据
+		if !resp.Data.HasMore || resp.Data.NextPageToken == "" {
+			break
+		}
+
+		pageToken = resp.Data.NextPageToken
+	}
+
+	return allFiles, nil
 }
 
 // CreateFolder 创建文件夹

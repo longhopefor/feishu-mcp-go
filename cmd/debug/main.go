@@ -120,6 +120,15 @@ func main() {
 		debugDeleteBlocks(client, logger)
 	case "batch-create":
 		debugBatchCreateBlocks(client, logger)
+	// 新增的云空间相关的debug测试
+	case "drive-files-meta":
+		debugGetDriveFilesWithMeta(client, logger)
+	case "drive-meta":
+		debugGetDriveMeta(client, logger)
+	case "all-drive-files":
+		debugGetAllDriveFiles(client, logger)
+	case "root-folder-meta":
+		debugGetRootFolderMeta(client, logger)
 	default:
 		fmt.Println("支持的操作:")
 		fmt.Println("文档操作:")
@@ -141,6 +150,11 @@ func main() {
 		fmt.Println("文件夹操作:")
 		fmt.Println("  folder-info - 测试获取文件夹信息")
 		fmt.Println("  folder      - 测试获取文件夹信息")
+		fmt.Println("云空间操作:")
+		fmt.Println("  drive-files-meta - 测试获取云空间文件详细信息 (可选 -folder-token, -page-size, -page-token)")
+		fmt.Println("  drive-meta       - 测试获取云空间文件元数据 (需要 -folder-token 作为fileToken)")
+		fmt.Println("  all-drive-files  - 测试获取目录下所有文件 (可选 -folder-token, -page-size)")
+		fmt.Println("  root-folder-meta - 测试获取根文件夹元数据 (使用新的API端点)")
 		fmt.Println("知识库操作:")
 		fmt.Println("  wiki-spaces - 测试获取知识库空间列表 (可选 -page-size, -page-token)")
 		fmt.Println("  wiki-nodes  - 测试获取知识库节点列表 (需要 -space-id, 可选 -parent-node)")
@@ -317,11 +331,12 @@ func debugGetFolderInfo(client *feishu.Client, logger logger.Logger) {
 		fmt.Printf("✅ 成功获取根目录信息！\n")
 		fmt.Printf("📊 响应代码: %d\n", rootInfo.Code)
 		fmt.Printf("📄 消息: %s\n", rootInfo.Msg)
-		fmt.Printf("📁 文件夹数量: %d\n", len(rootInfo.Folders))
+		fmt.Printf("📁 文件数量: %d\n", len(rootInfo.Data.Files))
 
-		for i, folder := range rootInfo.Folders {
-			fmt.Printf("   %d. 文件夹名: %s\n", i+1, folder.FolderName)
-			fmt.Printf("      Token: %s\n", folder.FolderToken)
+		for i, file := range rootInfo.Data.Files {
+			fmt.Printf("   %d. 文件名: %s\n", i+1, file.Name)
+			fmt.Printf("      Token: %s\n", file.Token)
+			fmt.Printf("      类型: %s\n", file.Type)
 		}
 		return
 	}
@@ -350,11 +365,12 @@ func debugGetFolderInfo(client *feishu.Client, logger logger.Logger) {
 	fmt.Printf("✅ 成功获取文件列表！\n")
 	fmt.Printf("📊 响应代码: %d\n", fileList.Code)
 	fmt.Printf("📄 消息: %s\n", fileList.Msg)
-	fmt.Printf("📁 文件数量: %d\n", len(fileList.Folders))
+	fmt.Printf("📁 文件数量: %d\n", len(fileList.Data.Files))
 
-	for i, file := range fileList.Folders {
-		fmt.Printf("   %d. 文件名: %s\n", i+1, file.FolderName)
-		fmt.Printf("      Token: %s\n", file.FolderToken)
+	for i, file := range fileList.Data.Files {
+		fmt.Printf("   %d. 文件名: %s\n", i+1, file.Name)
+		fmt.Printf("      Token: %s\n", file.Token)
+		fmt.Printf("      类型: %s\n", file.Type)
 	}
 }
 
@@ -718,4 +734,115 @@ func debugBatchCreateBlocks(client *feishu.Client, logger logger.Logger) {
 
 	fmt.Printf("🎉 批量创建块完成! 共创建 %d 个块\n", len(blockIDs))
 	printJSON("创建的块ID列表", blockIDs)
+}
+
+// 新增的云空间相关debug函数
+
+func debugGetDriveFilesWithMeta(client *feishu.Client, logger logger.Logger) {
+	fmt.Printf("🗂️ 测试获取云空间文件详细信息\n")
+
+	if *folderToken != "" {
+		fmt.Printf("📁 文件夹Token: %s\n", *folderToken)
+	} else {
+		fmt.Printf("📁 文件夹Token: (空，表示根目录)\n")
+	}
+	fmt.Printf("📄 分页大小: %d\n", *pageSize)
+	if *pageToken != "" {
+		fmt.Printf("🔖 分页Token: %s\n", *pageToken)
+	}
+
+	response, err := client.GetDriveFilesWithMeta(*folderToken, *pageSize, *pageToken)
+	if err != nil {
+		fmt.Printf("❌ 获取云空间文件详细信息失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ 获取云空间文件详细信息成功!\n")
+	fmt.Printf("📊 文件数量: %d\n", len(response.Data.Files))
+	fmt.Printf("🔄 是否有更多数据: %t\n", response.Data.HasMore)
+	if response.Data.NextPageToken != "" {
+		fmt.Printf("🔖 下一页Token: %s\n", response.Data.NextPageToken)
+	}
+
+	printJSON("云空间文件详细信息", response.Data.Files)
+}
+
+func debugGetDriveMeta(client *feishu.Client, logger logger.Logger) {
+	if *folderToken == "" {
+		fmt.Println("❌ 获取云空间文件元数据需要 -folder-token 参数 (作为fileToken)")
+		return
+	}
+
+	fmt.Printf("🔍 测试获取云空间文件元数据\n")
+	fmt.Printf("📋 文件Token: %s\n", *folderToken)
+
+	response, err := client.GetDriveMeta(*folderToken)
+	if err != nil {
+		fmt.Printf("❌ 获取云空间文件元数据失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ 获取云空间文件元数据成功!\n")
+	fmt.Printf("📋 文件名: %s\n", response.Data.Name)
+	fmt.Printf("📋 文件类型: %s\n", response.Data.Type)
+	fmt.Printf("📋 文件大小: %d bytes\n", response.Data.Size)
+	fmt.Printf("📋 创建时间: %s\n", response.Data.CreatedTime)
+	fmt.Printf("📋 修改时间: %s\n", response.Data.ModifiedTime)
+
+	printJSON("云空间文件元数据", response.Data)
+}
+
+func debugGetAllDriveFiles(client *feishu.Client, logger logger.Logger) {
+	fmt.Printf("📁 测试获取目录下所有文件\n")
+
+	if *folderToken != "" {
+		fmt.Printf("📁 文件夹Token: %s\n", *folderToken)
+	} else {
+		fmt.Printf("📁 文件夹Token: (空，表示根目录)\n")
+	}
+
+	maxFiles := *pageSize
+	if maxFiles == 0 {
+		maxFiles = 100 // 默认限制100个文件
+	}
+	fmt.Printf("📊 最大文件数: %d\n", maxFiles)
+
+	files, err := client.GetAllDriveFiles(*folderToken, maxFiles)
+	if err != nil {
+		fmt.Printf("❌ 获取目录下所有文件失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ 获取目录下所有文件成功!\n")
+	fmt.Printf("📊 文件总数: %d\n", len(files))
+
+	if len(files) > 0 {
+		fmt.Printf("📋 文件类型统计:\n")
+		fileTypes := make(map[string]int)
+		for _, file := range files {
+			fileTypes[file.Type]++
+		}
+		for fileType, count := range fileTypes {
+			fmt.Printf("  - %s: %d 个\n", fileType, count)
+		}
+	}
+
+	printJSON("目录下所有文件", files)
+}
+
+func debugGetRootFolderMeta(client *feishu.Client, logger logger.Logger) {
+	fmt.Printf("📂 测试获取根文件夹元数据（使用新的API端点）\n")
+
+	response, err := client.GetRootFolderMeta()
+	if err != nil {
+		fmt.Printf("❌ 获取根文件夹元数据失败: %v\n", err)
+		return
+	}
+
+	fmt.Printf("✅ 获取根文件夹元数据成功!\n")
+	fmt.Printf("📋 根文件夹Token: %s\n", response.Data.Token)
+	fmt.Printf("📋 根文件夹ID: %s\n", response.Data.ID)
+	fmt.Printf("📋 用户ID: %s\n", response.Data.UserID)
+
+	printJSON("根文件夹元数据", response.Data)
 }

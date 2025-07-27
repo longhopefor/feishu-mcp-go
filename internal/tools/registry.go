@@ -113,8 +113,12 @@ func (r *ToolRegistry) registerContentTools() error {
 func (r *ToolRegistry) registerFolderTools() error {
 	tools := []server.ServerTool{
 		NewGetRootFolderInfoTool(r.feishu, r.logger),
+		NewGetRootFolderMetaTool(r.feishu, r.logger),
 		NewGetFolderFilesTool(r.feishu, r.logger),
 		NewCreateFolderTool(r.feishu, r.logger),
+		NewGetDriveFilesWithMetaTool(r.feishu, r.logger),
+		NewGetDriveMetaTool(r.feishu, r.logger),
+		NewGetAllDriveFilesTool(r.feishu, r.logger),
 	}
 
 	r.server.AddTools(tools...)
@@ -159,5 +163,5 @@ func (r *ToolRegistry) registerUtilityTools() error {
 
 // getToolCount 获取已注册工具数量
 func (r *ToolRegistry) getToolCount() int {
-	return 21 // 总共21个工具：文档管理5个 + 内容操作8个 + 文件夹管理3个 + 知识库4个 + 工具功能2个 = 21个
+	return 25 // 总共25个工具：文档管理5个 + 内容操作8个 + 文件夹管理7个 + 知识库4个 + 工具功能2个 = 25个
 }
