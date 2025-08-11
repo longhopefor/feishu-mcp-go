@@ -16,7 +16,9 @@ import (
 
 func NewGetBlockContentTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_block_content",
-		mcp.WithDescription("获取飞书文档中指定块的详细内容"))
+		mcp.WithDescription("获取飞书文档中指定块的详细内容"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识包含目标块的文档"), mcp.Required()),
+		mcp.WithString("blockId", mcp.Description("块ID，用于标识要获取内容的具体块"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getBlockContent(feishu, logger, request)
 	}
@@ -25,7 +27,11 @@ func NewGetBlockContentTool(feishu *feishu.Client, logger logger.Logger) server.
 
 func NewUpdateBlockTextTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("update_feishu_block_text",
-		mcp.WithDescription("更新飞书文档中指定块的文本内容和样式"))
+		mcp.WithDescription("更新飞书文档中指定块的文本内容和样式"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识包含目标块的文档"), mcp.Required()),
+		mcp.WithString("blockId", mcp.Description("块ID，用于标识要更新的具体块"), mcp.Required()),
+		mcp.WithString("content", mcp.Description("要更新的文本内容"), mcp.Required()),
+		mcp.WithString("style", mcp.Description("文本样式，可选，如粗体、斜体等")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return updateBlockText(feishu, logger, request)
 	}
@@ -34,7 +40,10 @@ func NewUpdateBlockTextTool(feishu *feishu.Client, logger logger.Logger) server.
 
 func NewBatchCreateBlocksTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("batch_create_feishu_blocks",
-		mcp.WithDescription("批量创建多个飞书文档块"))
+		mcp.WithDescription("批量创建多个飞书文档块"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要添加块的文档"), mcp.Required()),
+		mcp.WithString("parentId", mcp.Description("父块ID，用于指定新块的位置，可选")),
+		mcp.WithString("blocks", mcp.Description("要创建的块列表，JSON格式字符串"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return batchCreateBlocks(feishu, logger, request)
 	}
@@ -43,7 +52,11 @@ func NewBatchCreateBlocksTool(feishu *feishu.Client, logger logger.Logger) serve
 
 func NewCreateTextBlockTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("create_feishu_text_block",
-		mcp.WithDescription("创建新的文本块"))
+		mcp.WithDescription("创建新的文本块"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要添加文本块的文档"), mcp.Required()),
+		mcp.WithString("content", mcp.Description("文本块的内容"), mcp.Required()),
+		mcp.WithString("parentId", mcp.Description("父块ID，用于指定文本块的位置，可选")),
+		mcp.WithString("style", mcp.Description("文本样式，可选，如粗体、斜体等")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return createTextBlock(feishu, logger, request)
 	}
@@ -52,7 +65,11 @@ func NewCreateTextBlockTool(feishu *feishu.Client, logger logger.Logger) server.
 
 func NewCreateCodeBlockTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("create_feishu_code_block",
-		mcp.WithDescription("创建新的代码块"))
+		mcp.WithDescription("创建新的代码块"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要添加代码块的文档"), mcp.Required()),
+		mcp.WithString("content", mcp.Description("代码块的内容"), mcp.Required()),
+		mcp.WithString("language", mcp.Description("编程语言类型，如javascript、python等"), mcp.Required()),
+		mcp.WithString("parentId", mcp.Description("父块ID，用于指定代码块的位置，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return createCodeBlock(feishu, logger, request)
 	}
@@ -61,7 +78,11 @@ func NewCreateCodeBlockTool(feishu *feishu.Client, logger logger.Logger) server.
 
 func NewCreateHeadingBlockTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("create_feishu_heading_block",
-		mcp.WithDescription("创建新的标题块"))
+		mcp.WithDescription("创建新的标题块"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要添加标题块的文档"), mcp.Required()),
+		mcp.WithString("content", mcp.Description("标题内容"), mcp.Required()),
+		mcp.WithNumber("level", mcp.Description("标题级别，1-3，1为最高级别"), mcp.Required()),
+		mcp.WithString("parentId", mcp.Description("父块ID，用于指定标题块的位置，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return createHeadingBlock(feishu, logger, request)
 	}
@@ -70,7 +91,11 @@ func NewCreateHeadingBlockTool(feishu *feishu.Client, logger logger.Logger) serv
 
 func NewCreateListBlockTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("create_feishu_list_block",
-		mcp.WithDescription("创建新的列表块"))
+		mcp.WithDescription("创建新的列表块"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要添加列表块的文档"), mcp.Required()),
+		mcp.WithString("content", mcp.Description("列表项内容"), mcp.Required()),
+		mcp.WithString("type", mcp.Description("列表类型，bullet表示无序列表，ordered表示有序列表"), mcp.Required()),
+		mcp.WithString("parentId", mcp.Description("父块ID，用于指定列表块的位置，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return createListBlock(feishu, logger, request)
 	}
@@ -79,7 +104,10 @@ func NewCreateListBlockTool(feishu *feishu.Client, logger logger.Logger) server.
 
 func NewDeleteBlocksTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("delete_feishu_document_blocks",
-		mcp.WithDescription("删除飞书文档中的一个或多个连续块"))
+		mcp.WithDescription("删除飞书文档中的一个或多个连续块"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识包含要删除块的文档"), mcp.Required()),
+		mcp.WithString("startIndex", mcp.Description("删除起始块的索引位置"), mcp.Required()),
+		mcp.WithString("endIndex", mcp.Description("删除结束块的索引位置，包含此位置"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return deleteBlocks(feishu, logger, request)
 	}

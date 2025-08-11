@@ -142,7 +142,7 @@ EOF
 make build
 
 # 或手动构建
-go build -o build/feishu-mcp ./cmd/server/main.go
+go build -o build/feishu-mcp-go ./cmd/server/main.go
 ```
 
 ### 3.2 测试连接

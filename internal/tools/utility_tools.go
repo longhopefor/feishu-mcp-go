@@ -16,7 +16,8 @@ import (
 
 func NewConvertWikiTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("convert_feishu_wiki_to_document_id",
-		mcp.WithDescription("将飞书Wiki链接转换为文档ID"))
+		mcp.WithDescription("将飞书Wiki链接转换为文档ID"),
+		mcp.WithString("wikiUrl", mcp.Description("飞书Wiki的URL链接，需要转换为文档ID"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return convertWiki(feishu, logger, request)
 	}
@@ -25,7 +26,8 @@ func NewConvertWikiTool(feishu *feishu.Client, logger logger.Logger) server.Serv
 
 func NewGetImageResourceTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_image_resource",
-		mcp.WithDescription("获取飞书图片资源信息和内容"))
+		mcp.WithDescription("获取飞书图片资源信息和内容"),
+		mcp.WithString("token", mcp.Description("图片资源的token，用于标识要获取的图片资源"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getImageResource(feishu, logger, request)
 	}

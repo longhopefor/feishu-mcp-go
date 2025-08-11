@@ -14,7 +14,7 @@ help:
 	@echo "  deps     - 下载依赖"
 
 # 变量定义
-APP_NAME = feishu-mcp
+APP_NAME = feishu-mcp-go
 BUILD_DIR = build
 CMD_DIR = cmd/server
 VERSION ?= $(shell git describe --tags --always --dirty || echo "dev")

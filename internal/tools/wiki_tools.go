@@ -17,7 +17,9 @@ import (
 // NewGetWikiSpacesTool 获取知识库空间列表工具构造函数
 func NewGetWikiSpacesTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_wiki_spaces",
-		mcp.WithDescription("获取飞书知识库空间列表"))
+		mcp.WithDescription("获取飞书知识库空间列表"),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的知识库空间数量，默认为50"), mcp.DefaultNumber(50)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页数据，可选")))
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getWikiSpaces(feishu, logger, request)
@@ -28,7 +30,10 @@ func NewGetWikiSpacesTool(feishu *feishu.Client, logger logger.Logger) server.Se
 // NewGetWikiNodesTool 获取知识库节点列表工具构造函数
 func NewGetWikiNodesTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_wiki_nodes",
-		mcp.WithDescription("获取飞书知识库空间下的节点列表"))
+		mcp.WithDescription("获取飞书知识库空间下的节点列表"),
+		mcp.WithString("spaceId", mcp.Description("知识库空间ID，用于标识要获取节点的知识库空间"), mcp.Required()),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的节点数量，默认为50"), mcp.DefaultNumber(50)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页数据，可选")))
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getWikiNodes(feishu, logger, request)
@@ -39,7 +44,8 @@ func NewGetWikiNodesTool(feishu *feishu.Client, logger logger.Logger) server.Ser
 // NewGetWikiNodeContentTool 获取知识库节点内容工具构造函数
 func NewGetWikiNodeContentTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_wiki_node_content",
-		mcp.WithDescription("获取飞书知识库节点的内容"))
+		mcp.WithDescription("获取飞书知识库节点的内容"),
+		mcp.WithString("token", mcp.Description("知识库节点token，用于标识要获取内容的节点"), mcp.Required()))
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getWikiNodeContent(feishu, logger, request)
@@ -50,7 +56,8 @@ func NewGetWikiNodeContentTool(feishu *feishu.Client, logger logger.Logger) serv
 // NewGetWikiNodeMetaTool 获取知识库节点元信息工具构造函数
 func NewGetWikiNodeMetaTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_wiki_node_meta",
-		mcp.WithDescription("获取飞书知识库节点的元信息"))
+		mcp.WithDescription("获取飞书知识库节点的元信息"),
+		mcp.WithString("token", mcp.Description("知识库节点token，用于标识要获取元信息的节点"), mcp.Required()))
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getWikiNodeMeta(feishu, logger, request)

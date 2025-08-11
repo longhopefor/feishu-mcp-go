@@ -15,7 +15,9 @@ import (
 // NewCreateDocumentTool 创建文档工具构造函数
 func NewCreateDocumentTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("create_feishu_document",
-		mcp.WithDescription("创建新的飞书文档"))
+		mcp.WithDescription("创建新的飞书文档"),
+		mcp.WithString("title", mcp.Description("文档标题"), mcp.Required()),
+		mcp.WithString("folderToken", mcp.Description("父文件夹的token，用于指定文档创建位置"), mcp.Required()))
 
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return createDocument(feishu, logger, request)
@@ -25,7 +27,8 @@ func NewCreateDocumentTool(feishu *feishu.Client, logger logger.Logger) server.S
 
 func NewGetDocumentInfoTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_document_info",
-		mcp.WithDescription("获取飞书文档的基本信息"))
+		mcp.WithDescription("获取飞书文档的基本信息"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要获取信息的文档"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getDocumentInfo(feishu, logger, request)
 	}
@@ -34,7 +37,9 @@ func NewGetDocumentInfoTool(feishu *feishu.Client, logger logger.Logger) server.
 
 func NewGetDocumentContentTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_document_content",
-		mcp.WithDescription("获取飞书文档的纯文本内容"))
+		mcp.WithDescription("获取飞书文档的纯文本内容"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要获取内容的文档"), mcp.Required()),
+		mcp.WithNumber("lang", mcp.Description("语言类型，0表示中文，1表示英文，默认为0"), mcp.DefaultNumber(0)))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getDocumentContent(feishu, logger, request)
 	}
@@ -43,7 +48,10 @@ func NewGetDocumentContentTool(feishu *feishu.Client, logger logger.Logger) serv
 
 func NewGetDocumentBlocksTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_document_blocks",
-		mcp.WithDescription("获取飞书文档的块结构信息"))
+		mcp.WithDescription("获取飞书文档的块结构信息"),
+		mcp.WithString("documentId", mcp.Description("文档ID，用于标识要获取块结构的文档"), mcp.Required()),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的块数量，默认为50"), mcp.DefaultNumber(50)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页数据，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getDocumentBlocks(feishu, logger, request)
 	}
@@ -52,7 +60,10 @@ func NewGetDocumentBlocksTool(feishu *feishu.Client, logger logger.Logger) serve
 
 func NewSearchDocumentsTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("search_feishu_documents",
-		mcp.WithDescription("在飞书中搜索文档"))
+		mcp.WithDescription("在飞书中搜索文档"),
+		mcp.WithString("query", mcp.Description("搜索关键词，用于匹配文档标题或内容"), mcp.Required()),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的文档数量，默认为10"), mcp.DefaultNumber(10)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页搜索结果，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return searchDocuments(feishu, logger, request)
 	}

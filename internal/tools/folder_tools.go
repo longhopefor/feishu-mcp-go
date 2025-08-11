@@ -25,7 +25,10 @@ func NewGetRootFolderInfoTool(feishu *feishu.Client, logger logger.Logger) serve
 
 func NewGetFolderFilesTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_folder_files",
-		mcp.WithDescription("获取指定文件夹中的文件和子文件夹列表"))
+		mcp.WithDescription("获取指定文件夹中的文件和子文件夹列表"),
+		mcp.WithString("folderToken", mcp.Description("文件夹token，用于标识要获取文件列表的文件夹"), mcp.Required()),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的文件数量，默认为50"), mcp.DefaultNumber(50)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页数据，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getFolderFiles(feishu, logger, request)
 	}
@@ -34,7 +37,9 @@ func NewGetFolderFilesTool(feishu *feishu.Client, logger logger.Logger) server.S
 
 func NewCreateFolderTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("create_feishu_folder",
-		mcp.WithDescription("在指定父文件夹中创建新文件夹"))
+		mcp.WithDescription("在指定父文件夹中创建新文件夹"),
+		mcp.WithString("name", mcp.Description("新文件夹的名称"), mcp.Required()),
+		mcp.WithString("parentToken", mcp.Description("父文件夹的token，用于指定新文件夹的创建位置"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return createFolder(feishu, logger, request)
 	}
@@ -43,7 +48,10 @@ func NewCreateFolderTool(feishu *feishu.Client, logger logger.Logger) server.Ser
 
 func NewGetDriveFilesWithMetaTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_drive_files_with_meta",
-		mcp.WithDescription("获取云空间目录下所有文件的详细元数据信息"))
+		mcp.WithDescription("获取云空间目录下所有文件的详细元数据信息"),
+		mcp.WithString("folderToken", mcp.Description("文件夹token，用于标识要获取元数据的文件夹"), mcp.Required()),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的文件数量，默认为50"), mcp.DefaultNumber(50)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页数据，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getDriveFilesWithMeta(feishu, logger, request)
 	}
@@ -52,7 +60,8 @@ func NewGetDriveFilesWithMetaTool(feishu *feishu.Client, logger logger.Logger) s
 
 func NewGetDriveMetaTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_feishu_drive_meta",
-		mcp.WithDescription("获取云空间目录/文件的元数据信息"))
+		mcp.WithDescription("获取云空间目录/文件的元数据信息"),
+		mcp.WithString("requestDoc", mcp.Description("请求的文档token，用于获取指定文档的元数据"), mcp.Required()))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getDriveMeta(feishu, logger, request)
 	}
@@ -61,7 +70,10 @@ func NewGetDriveMetaTool(feishu *feishu.Client, logger logger.Logger) server.Ser
 
 func NewGetAllDriveFilesTool(feishu *feishu.Client, logger logger.Logger) server.ServerTool {
 	tool := mcp.NewTool("get_all_feishu_drive_files",
-		mcp.WithDescription("获取指定目录下所有文件（支持分页和数量限制）"))
+		mcp.WithDescription("获取指定目录下所有文件（支持分页和数量限制）"),
+		mcp.WithString("folderToken", mcp.Description("文件夹token，用于标识要获取所有文件的文件夹"), mcp.Required()),
+		mcp.WithNumber("pageSize", mcp.Description("每页返回的文件数量，默认为50"), mcp.DefaultNumber(50)),
+		mcp.WithString("pageToken", mcp.Description("分页令牌，用于获取下一页数据，可选")))
 	handler := func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		return getAllDriveFiles(feishu, logger, request)
 	}
